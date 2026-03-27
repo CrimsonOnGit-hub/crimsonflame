@@ -90,28 +90,23 @@
     </footer>
 
     <script type="module">
-        // 1. Import Firebase functions directly from the web
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
-        // =====================================================================
-        // 2. REPLACE THIS ENTIRE BLOCK WITH YOUR KEYS FROM FIREBASE
-        // =====================================================================
+        // Your brand new App Config
         const firebaseConfig = {
-            apiKey: "AIzaSyB6UQjgEZY_jeXuiuAtzVq_ZAYw3XgEfpE",
+            apiKey: "AIzaSyBSSJKDrFJ1_qlliZqgw34CY2TSaKOxxxM",
             authDomain: "crimsonflame-8169e.firebaseapp.com",
             projectId: "crimsonflame-8169e",
             storageBucket: "crimsonflame-8169e.firebasestorage.app",
             messagingSenderId: "406321213530",
-            appId: "1:406321213530:web:b8a7ebf3ac47000d93a863",
+            appId: "1:406321213530:web:92d27a69d34d147393a863",
+            measurementId: "G-TRK3848V9Q"
         };
-        // =====================================================================
 
-        // 3. Initialize Firebase
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
 
-        // 4. UI Elements
         const loginForm = document.getElementById('login-form');
         const emailInput = document.getElementById('email');
         const passwordInput = document.getElementById('password');
@@ -123,7 +118,6 @@
 
         let isLoginMode = true;
 
-        // 5. Toggle between Login and Register modes
         toggleAuthBtn.addEventListener('click', () => {
             isLoginMode = !isLoginMode;
             if (isLoginMode) {
@@ -137,14 +131,12 @@
             }
         });
 
-        // 6. Handle Form Submission
         loginForm.addEventListener('submit', (e) => {
             e.preventDefault(); 
             const email = emailInput.value;
             const password = passwordInput.value;
 
             if (isLoginMode) {
-                // LOGIN
                 signInWithEmailAndPassword(auth, email, password)
                     .then((userCredential) => {
                         console.log("Logged in!");
@@ -153,7 +145,6 @@
                         alert("Error: " + error.message);
                     });
             } else {
-                // REGISTER
                 createUserWithEmailAndPassword(auth, email, password)
                     .then((userCredential) => {
                         console.log("Registered!");
@@ -165,23 +156,19 @@
             }
         });
 
-        // 7. Handle Logout
         logoutBtn.addEventListener('click', () => {
             signOut(auth).then(() => {
                 console.log("Logged out successfully");
             });
         });
 
-        // 8. Listen for Auth State Changes
         onAuthStateChanged(auth, (user) => {
             if (user) {
-                // User is signed in
                 loginForm.style.display = 'none';
                 document.querySelector('.toggle-text').style.display = 'none';
                 dashboard.style.display = 'block';
                 authTitle.innerText = "Access Granted";
             } else {
-                // User is signed out
                 loginForm.style.display = 'flex';
                 document.querySelector('.toggle-text').style.display = 'block';
                 dashboard.style.display = 'none';
