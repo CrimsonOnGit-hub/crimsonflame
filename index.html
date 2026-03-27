@@ -6,17 +6,19 @@
     <title>CrimsonFlame | Official Site</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
 
     <header>
         <div class="container header-container">
-            <h1 class="logo">CRIMSON<span>FLAME</span></h1>
+            <h1 class="logo">Crimson<span>Flame</span></h1>
             <nav>
                 <ul>
                     <li><a href="#home">Home</a></li>
                     <li><a href="#news">Newest News</a></li>
-                    <li><a href="#auth-section">Agent Access</a></li>
+                    <li><a href="#auth-section">Sign in</a></li>
                 </ul>
             </nav>
         </div>
@@ -25,16 +27,15 @@
     <section id="home" class="hero">
         <div class="container">
             <h2>Forging New Realities.</h2>
-            <p>Welcome to the official home of CrimsonFlame. We build high-performance, immersive VR experiences.</p>
+            <p>Welcome to the official home of CrimsonFlame. We make VR games.</p>
         </div>
     </section>
 
     <section id="news" class="news-section">
         <div class="container">
             <h2 class="section-title">Newest News</h2>
-            
             <div id="news-feed">
-                <p style="color: var(--text-muted);">Loading protocol updates...</p>
+                <p style="color: var(--text-muted);">Loading...</p>
             </div>
         </div>
     </section>
@@ -45,13 +46,11 @@
             <div id="login-container">
                 <h2 id="auth-title">Agent Login</h2>
                 <p id="auth-message">Access the Crimson Protocol dashboard.</p>
-                
                 <form id="login-form">
                     <input type="email" id="email" placeholder="Email Address" required>
                     <input type="password" id="password" placeholder="Password" required>
                     <button type="submit" id="submit-btn" class="btn-primary">Initialize Login</button>
                 </form>
-                
                 <p class="toggle-text">
                     Don't have clearance? <span id="toggle-auth" class="text-link">Register here</span>
                 </p>
@@ -65,13 +64,13 @@
 
             <div id="admin-panel" style="display: none; margin-top: 30px; padding-top: 20px; border-top: 1px solid #333;">
                 <h3 style="color: #fff; margin-bottom: 15px;">Admin Control Panel</h3>
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 10px;">Use Markdown (# Title, **Bold**, - Bullet)</p>
                 <form id="news-form">
-                    <input type="text" id="news-title" placeholder="Update Title (e.g., The Shrink Time!)" required>
-                    <textarea id="news-body" placeholder="Paste your HTML newsletter here..." rows="6" required></textarea>
+                    <input type="text" id="news-title" placeholder="Update Title" required>
+                    <textarea id="news-body" placeholder="Type update here..." rows="8" required></textarea>
                     <button type="submit" class="btn-primary" style="width: 100%;">Publish to Grid</button>
                 </form>
             </div>
-
         </div>
     </section>
 
@@ -82,12 +81,10 @@
     </footer>
 
     <script type="module">
-        // Import Firebase Auth and Firestore tools
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
-        // 1. Firebase Configuration (Using your working keys)
         const firebaseConfig = {
             apiKey: "AIzaSyBSSJKDrFJ1_qlliZqgw34CY2TSaKOxxxM",
             authDomain: "crimsonflame-8169e.firebaseapp.com",
@@ -98,15 +95,13 @@
             measurementId: "G-TRK3848V9Q"
         };
 
-        // 2. SET YOUR EXACT ADMIN EMAIL HERE!
+        // --- EDIT THIS LINE ---
         const ADMIN_EMAIL = "allaboutwaterdiamond@gmail.com"; 
 
-        // Initialize Firebase
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        // UI Elements
         const loginContainer = document.getElementById('login-container');
         const loginForm = document.getElementById('login-form');
         const dashboard = document.getElementById('dashboard');
@@ -114,104 +109,71 @@
         const newsForm = document.getElementById('news-form');
         const newsFeed = document.getElementById('news-feed');
 
-        // --- FETCH AND DISPLAY NEWS ---
         async function loadNews() {
             try {
                 const q = query(collection(db, "news"), orderBy("timestamp", "desc"));
                 const querySnapshot = await getDocs(q);
-                
                 newsFeed.innerHTML = ""; 
-
                 if (querySnapshot.empty) {
                     newsFeed.innerHTML = "<p style='color: var(--text-muted);'>No recent updates from the grid.</p>";
                     return;
                 }
-
                 querySnapshot.forEach((doc) => {
                     const data = doc.data();
-                    const articleHTML = `
+                    const formattedBody = marked.parse(data.body); // Converts Markdown to HTML
+                    newsFeed.innerHTML += `
                         <article class="news-card" style="margin-bottom: 30px;">
                             <span class="news-date">${data.date}</span>
                             <h3>${data.title}</h3>
-                            <div class="news-content">
-                                ${data.body}
-                            </div>
-                        </article>
-                    `;
-                    newsFeed.innerHTML += articleHTML;
+                            <div class="news-content">${formattedBody}</div>
+                        </article>`;
                 });
-            } catch (error) {
-                console.error("Error loading news: ", error);
-                newsFeed.innerHTML = "<p style='color: red;'>Error connecting to the databanks.</p>";
-            }
+            } catch (err) { newsFeed.innerHTML = "<p style='color: red;'>Connection Error.</p>"; }
         }
 
-        // Run the news loader
         loadNews();
 
-        // --- SUBMIT NEW UPDATE (ADMIN ONLY) ---
         newsForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const title = document.getElementById('news-title').value;
             const body = document.getElementById('news-body').value;
-            const today = new Date().toLocaleDateString();
-
             try {
                 await addDoc(collection(db, "news"), {
-                    title: title,
-                    body: body,
-                    date: today,
-                    timestamp: new Date()
+                    title, body, date: new Date().toLocaleDateString(), timestamp: new Date()
                 });
-                alert("Update successfully published to the grid!");
+                alert("Published!");
                 newsForm.reset();
-                loadNews(); // Refresh the feed instantly
-            } catch (error) {
-                alert("Authorization Denied: You do not have permission to publish. Check your Firebase Rules.");
-                console.error("Error adding document: ", error);
-            }
+                loadNews();
+            } catch (err) { alert("Access Denied."); }
         });
 
-        // --- AUTHENTICATION LOGIC ---
         let isLoginMode = true;
         document.getElementById('toggle-auth').addEventListener('click', () => {
             isLoginMode = !isLoginMode;
-            document.getElementById('auth-title').innerText = isLoginMode ? "Login" : "Sign in";
-            document.getElementById('submit-btn').innerText = isLoginMode ? "Sign Up" : "Register Account";
+            document.getElementById('auth-title').innerText = isLoginMode ? "Agent Login" : "Request Clearance";
+            document.getElementById('submit-btn').innerText = isLoginMode ? "Initialize Login" : "Register Account";
             document.getElementById('toggle-auth').innerText = isLoginMode ? "Register here" : "Login here";
         });
 
         loginForm.addEventListener('submit', (e) => {
-            e.preventDefault(); 
+            e.preventDefault();
             const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-
-            if (isLoginMode) {
-                signInWithEmailAndPassword(auth, email, password).catch(err => alert("Error: " + err.message));
-            } else {
-                createUserWithEmailAndPassword(auth, email, password)
-                    .then(() => alert("Account created successfully!"))
-                    .catch(err => alert("Error: " + err.message));
-            }
+            const pass = document.getElementById('password').value;
+            if (isLoginMode) signInWithEmailAndPassword(auth, email, pass).catch(err => alert(err.message));
+            else createUserWithEmailAndPassword(auth, email, pass).then(() => alert("Created!")).catch(err => alert(err.message));
         });
 
         document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
 
-        // Watch for user login/logout
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 loginContainer.style.display = 'none';
                 dashboard.style.display = 'block';
-                
-                // UNLOCK ADMIN PANEL IF EMAILS MATCH
-                if (user.email === ADMIN_EMAIL) {
-                    adminPanel.style.display = 'block';
-                }
+                if (user.email === ADMIN_EMAIL) adminPanel.style.display = 'block';
             } else {
                 loginContainer.style.display = 'block';
                 dashboard.style.display = 'none';
                 adminPanel.style.display = 'none';
-                loginForm.reset();
             }
         });
     </script>
