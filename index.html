@@ -33,53 +33,45 @@
         <div class="container">
             <h2 class="section-title">Newest News</h2>
             
-            <article class="news-card">
-                <span class="news-date">Latest Update</span>
-                <h3>Crimson Protocol Set to Ignite the Meta Horizon Store</h3>
-                <p><strong>CrimsonFlame is proud to officially announce that our latest project, Crimson Protocol, has entered the final stages of submission for the Meta Horizon Store.</strong></p>
-                
-                <p>Following our recent organization verification, the team at CrimsonFlame has been hard at work finalizing the "App Metadata" and meeting the rigorous Virtual Reality Checks (VRCs) required by Meta. This ensures that when you step into the world of Crimson Protocol, you’re getting a high-performance, seamless VR experience.</p>
-                
-                <h4>What to Expect</h4>
-                <p>While the internal "Crimson Protocol" is currently undergoing final review, we are preparing to open the gates to a new reality. As seen in our latest developer dashboard updates, we are committed to transparency and quality, ensuring all privacy policies and technical specs are 100% compliant for a smooth global launch.</p>
-                
-                <h4>Stay Connected</h4>
-                <p>This section of our official website will be the primary hub for:</p>
-                <ul class="news-list">
-                    <li><strong>Release Date Announcements:</strong> Be the first to know when the "Submit for Review" button turns into a live "Download" link.</li>
-                    <li><strong>Gameplay Sneak Peeks:</strong> Deep dives into the mechanics of the protocol.</li>
-                    <li><strong>Developer Updates:</strong> Direct insights from the CrimsonFlame team.</li>
-                </ul>
-                
-                <div class="quote-block">
-                    "Your organization is verified." With the technical hurdles behind us, our full focus is now on delivering the best version of Crimson Protocol to your headset.
-                </div>
-                
-                <p class="sign-off">Keep your eyes on this space. <em>The protocol is initializing.</em></p>
-            </article>
+            <div id="news-feed">
+                <p style="color: var(--text-muted);">Loading protocol updates...</p>
+            </div>
         </div>
     </section>
 
     <section id="auth-section" class="auth-container">
         <div class="auth-card">
-            <h2 id="auth-title">Agent Login</h2>
-            <p id="auth-message">Access the Crimson Protocol dashboard.</p>
             
-            <form id="login-form">
-                <input type="email" id="email" placeholder="Email Address" required>
-                <input type="password" id="password" placeholder="Password" required>
-                <button type="submit" id="submit-btn" class="btn-primary">Initialize Login</button>
-            </form>
-            
-            <p class="toggle-text">
-                Don't have clearance? <span id="toggle-auth" class="text-link">Register here</span>
-            </p>
+            <div id="login-container">
+                <h2 id="auth-title">Agent Login</h2>
+                <p id="auth-message">Access the Crimson Protocol dashboard.</p>
+                
+                <form id="login-form">
+                    <input type="email" id="email" placeholder="Email Address" required>
+                    <input type="password" id="password" placeholder="Password" required>
+                    <button type="submit" id="submit-btn" class="btn-primary">Initialize Login</button>
+                </form>
+                
+                <p class="toggle-text">
+                    Don't have clearance? <span id="toggle-auth" class="text-link">Register here</span>
+                </p>
+            </div>
 
             <div id="dashboard" style="display: none;">
                 <h3 style="color: var(--crimson);">Welcome back, Agent.</h3>
                 <p>Your connection to the protocol is secure.</p>
                 <button id="logout-btn" class="btn-secondary">Disconnect</button>
             </div>
+
+            <div id="admin-panel" style="display: none; margin-top: 30px; padding-top: 20px; border-top: 1px solid #333;">
+                <h3 style="color: #fff; margin-bottom: 15px;">Admin Control Panel</h3>
+                <form id="news-form">
+                    <input type="text" id="news-title" placeholder="Update Title (e.g., The Shrink Time!)" required>
+                    <textarea id="news-body" placeholder="Paste your HTML newsletter here..." rows="6" required></textarea>
+                    <button type="submit" class="btn-primary" style="width: 100%;">Publish to Grid</button>
+                </form>
+            </div>
+
         </div>
     </section>
 
@@ -90,10 +82,12 @@
     </footer>
 
     <script type="module">
+        // Import Firebase Auth and Firestore tools
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
-        // Your brand new App Config
+        // 1. Firebase Configuration (Using your working keys)
         const firebaseConfig = {
             apiKey: "AIzaSyBSSJKDrFJ1_qlliZqgw34CY2TSaKOxxxM",
             authDomain: "crimsonflame-8169e.firebaseapp.com",
@@ -104,75 +98,119 @@
             measurementId: "G-TRK3848V9Q"
         };
 
+        // 2. SET YOUR EXACT ADMIN EMAIL HERE!
+        const ADMIN_EMAIL = "allaboutwaterdiamond@gmail.com"; 
+
+        // Initialize Firebase
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
+        const db = getFirestore(app);
 
+        // UI Elements
+        const loginContainer = document.getElementById('login-container');
         const loginForm = document.getElementById('login-form');
-        const emailInput = document.getElementById('email');
-        const passwordInput = document.getElementById('password');
-        const toggleAuthBtn = document.getElementById('toggle-auth');
-        const authTitle = document.getElementById('auth-title');
-        const submitBtn = document.getElementById('submit-btn');
         const dashboard = document.getElementById('dashboard');
-        const logoutBtn = document.getElementById('logout-btn');
+        const adminPanel = document.getElementById('admin-panel');
+        const newsForm = document.getElementById('news-form');
+        const newsFeed = document.getElementById('news-feed');
 
-        let isLoginMode = true;
+        // --- FETCH AND DISPLAY NEWS ---
+        async function loadNews() {
+            try {
+                const q = query(collection(db, "news"), orderBy("timestamp", "desc"));
+                const querySnapshot = await getDocs(q);
+                
+                newsFeed.innerHTML = ""; 
 
-        toggleAuthBtn.addEventListener('click', () => {
-            isLoginMode = !isLoginMode;
-            if (isLoginMode) {
-                authTitle.innerText = "Agent Login";
-                submitBtn.innerText = "Initialize Login";
-                toggleAuthBtn.innerText = "Register here";
-            } else {
-                authTitle.innerText = "Request Clearance";
-                submitBtn.innerText = "Register Account";
-                toggleAuthBtn.innerText = "Login here";
+                if (querySnapshot.empty) {
+                    newsFeed.innerHTML = "<p style='color: var(--text-muted);'>No recent updates from the grid.</p>";
+                    return;
+                }
+
+                querySnapshot.forEach((doc) => {
+                    const data = doc.data();
+                    const articleHTML = `
+                        <article class="news-card" style="margin-bottom: 30px;">
+                            <span class="news-date">${data.date}</span>
+                            <h3>${data.title}</h3>
+                            <div class="news-content">
+                                ${data.body}
+                            </div>
+                        </article>
+                    `;
+                    newsFeed.innerHTML += articleHTML;
+                });
+            } catch (error) {
+                console.error("Error loading news: ", error);
+                newsFeed.innerHTML = "<p style='color: red;'>Error connecting to the databanks.</p>";
             }
+        }
+
+        // Run the news loader
+        loadNews();
+
+        // --- SUBMIT NEW UPDATE (ADMIN ONLY) ---
+        newsForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const title = document.getElementById('news-title').value;
+            const body = document.getElementById('news-body').value;
+            const today = new Date().toLocaleDateString();
+
+            try {
+                await addDoc(collection(db, "news"), {
+                    title: title,
+                    body: body,
+                    date: today,
+                    timestamp: new Date()
+                });
+                alert("Update successfully published to the grid!");
+                newsForm.reset();
+                loadNews(); // Refresh the feed instantly
+            } catch (error) {
+                alert("Authorization Denied: You do not have permission to publish. Check your Firebase Rules.");
+                console.error("Error adding document: ", error);
+            }
+        });
+
+        // --- AUTHENTICATION LOGIC ---
+        let isLoginMode = true;
+        document.getElementById('toggle-auth').addEventListener('click', () => {
+            isLoginMode = !isLoginMode;
+            document.getElementById('auth-title').innerText = isLoginMode ? "Login" : "Sign in";
+            document.getElementById('submit-btn').innerText = isLoginMode ? "Sign Up" : "Register Account";
+            document.getElementById('toggle-auth').innerText = isLoginMode ? "Register here" : "Login here";
         });
 
         loginForm.addEventListener('submit', (e) => {
             e.preventDefault(); 
-            const email = emailInput.value;
-            const password = passwordInput.value;
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
 
             if (isLoginMode) {
-                signInWithEmailAndPassword(auth, email, password)
-                    .then((userCredential) => {
-                        console.log("Logged in!");
-                    })
-                    .catch((error) => {
-                        alert("Error: " + error.message);
-                    });
+                signInWithEmailAndPassword(auth, email, password).catch(err => alert("Error: " + err.message));
             } else {
                 createUserWithEmailAndPassword(auth, email, password)
-                    .then((userCredential) => {
-                        console.log("Registered!");
-                        alert("Account created successfully! You are now logged in.");
-                    })
-                    .catch((error) => {
-                        alert("Error: " + error.message);
-                    });
+                    .then(() => alert("Account created successfully!"))
+                    .catch(err => alert("Error: " + err.message));
             }
         });
 
-        logoutBtn.addEventListener('click', () => {
-            signOut(auth).then(() => {
-                console.log("Logged out successfully");
-            });
-        });
+        document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
 
+        // Watch for user login/logout
         onAuthStateChanged(auth, (user) => {
             if (user) {
-                loginForm.style.display = 'none';
-                document.querySelector('.toggle-text').style.display = 'none';
+                loginContainer.style.display = 'none';
                 dashboard.style.display = 'block';
-                authTitle.innerText = "Access Granted";
+                
+                // UNLOCK ADMIN PANEL IF EMAILS MATCH
+                if (user.email === ADMIN_EMAIL) {
+                    adminPanel.style.display = 'block';
+                }
             } else {
-                loginForm.style.display = 'flex';
-                document.querySelector('.toggle-text').style.display = 'block';
+                loginContainer.style.display = 'block';
                 dashboard.style.display = 'none';
-                authTitle.innerText = isLoginMode ? "Agent Login" : "Request Clearance";
+                adminPanel.style.display = 'none';
                 loginForm.reset();
             }
         });
