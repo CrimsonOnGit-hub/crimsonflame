@@ -7,6 +7,13 @@
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    <script type="text/javascript">
+        (function() {
+            emailjs.init("invG_cVokMtCIdBX8");
+        })();
+    </script>
 </head>
 <body>
 
@@ -59,7 +66,6 @@
     <main id="page-tickets" class="page-content" style="display:none;">
         <section class="container" style="padding-top:40px;">
             <h2 class="section-title">Support Protocol</h2>
-            
             <div id="ticket-system" style="display:none;">
                 <div id="list-view">
                     <div class="auth-card" style="max-width:100%; text-align:left; margin-bottom:20px;">
@@ -81,18 +87,29 @@
                     <button id="back-btn" class="text-link"><- Back</button>
                     <h2 id="active-subject" style="margin:15px 0 5px;"></h2>
                     <p id="active-status" style="font-size:0.8rem; margin-bottom:15px;"></p>
+                    
+                    <div id="resolution-box" style="display:none; background:rgba(220, 20, 60, 0.1); border:1px solid var(--crimson); padding:10px; border-radius:5px; margin-bottom:15px;">
+                        <strong style="color:var(--crimson);">Protocol Resolution:</strong>
+                        <p id="resolution-text" style="font-size:0.9rem; margin-top:5px;"></p>
+                    </div>
+
                     <div id="chat-box" style="height:300px; overflow-y:auto; display:flex; flex-direction:column; gap:10px; padding:10px; background:#000; border-radius:5px; margin-bottom:15px;"></div>
+                    
                     <form id="chat-form" style="display:flex; gap:10px;">
                         <input type="text" id="chat-input" placeholder="Message..." required>
                         <button type="submit" class="btn-primary">Send</button>
                     </form>
-                    <button id="close-ticket-btn" class="btn-secondary" style="display:none; width:100%; margin-top:15px; border-color:orange; color:orange;">Close Ticket</button>
+
+                    <div id="admin-close-area" style="display:none; margin-top:15px; border-top:1px solid #333; padding-top:15px;">
+                        <textarea id="close-reason" placeholder="Resolution reason..." rows="2"></textarea>
+                        <button id="close-ticket-btn" class="btn-secondary" style="width:100%; border-color:orange; color:orange;">Finalize & Close Ticket</button>
+                    </div>
                 </div>
             </div>
             
             <div id="ticket-locked" style="text-align:center; padding:40px;">
                 <p>Login required for support.</p>
-                <button onclick="routeTo('login')" class="btn-primary" style="margin-top:15px;">Login</button>
+                <button onclick="routeTo('login')" class="btn-primary" style="margin-top:15px; width:auto;">Login</button>
             </div>
         </section>
     </main>
@@ -121,6 +138,13 @@
         let activeTicketId = null;
         let chatUnsubscribe = null;
 
+        // --- EMAIL HELPERS ---
+        function sendProtocolEmail(templateId, params) {
+            emailjs.send("service_ka3dbxo", templateId, params)
+                .then(() => console.log("Protocol Dispatch Successful."))
+                .catch(err => console.error("Protocol Dispatch Failed:", err));
+        }
+
         // --- ROUTING ---
         window.routeTo = function(page) {
             const url = new URL(window.location);
@@ -134,7 +158,6 @@
             document.querySelectorAll('.page-content').forEach(p => p.style.display = 'none');
             const target = document.getElementById('page-' + page);
             if(target) target.style.display = 'block';
-            
             if(page === 'home') fetchNews();
             if(page === 'tickets') {
                 document.getElementById('list-view').style.display = 'block';
@@ -172,13 +195,11 @@
         window.fetchTickets = async function() {
             if(!auth.currentUser) return;
             const list = document.getElementById('ticket-list');
-            list.innerHTML = "Syncing...";
-            
+            list.innerHTML = "Syncing Grid...";
             let q = query(collection(db, "tickets"), orderBy("timestamp", "desc"));
             if(auth.currentUser.email !== ADMIN_EMAIL) {
                 q = query(collection(db, "tickets"), where("userId", "==", auth.currentUser.uid), orderBy("timestamp", "desc"));
             }
-            
             const snap = await getDocs(q);
             list.innerHTML = "";
             snap.forEach(tDoc => {
@@ -199,14 +220,35 @@
             document.getElementById('active-subject').innerText = data.subject;
             document.getElementById('active-status').innerText = "Status: " + data.status;
 
-            const closeBtn = document.getElementById('close-ticket-btn');
-            if(auth.currentUser.email === ADMIN_EMAIL) {
-                closeBtn.style.display = 'block';
-                closeBtn.onclick = async () => {
-                    await updateDoc(doc(db, "tickets", id), { status: "Closed" });
-                    document.getElementById('back-btn').click();
-                };
+            const chatForm = document.getElementById('chat-form');
+            const resBox = document.getElementById('resolution-box');
+            const adminArea = document.getElementById('admin-close-area');
+
+            if (data.status === "Closed") {
+                chatForm.style.display = 'none';
+                adminArea.style.display = 'none';
+                resBox.style.display = 'block';
+                document.getElementById('resolution-text').innerText = data.closeReason || "No reason recorded.";
+            } else {
+                chatForm.style.display = 'flex';
+                resBox.style.display = 'none';
+                adminArea.style.display = (auth.currentUser.email === ADMIN_EMAIL) ? 'block' : 'none';
             }
+
+            document.getElementById('close-ticket-btn').onclick = async () => {
+                const r = document.getElementById('close-reason').value;
+                if(!r) return alert("Resolution required.");
+                await updateDoc(doc(db, "tickets", id), { status: "Closed", closeReason: r });
+                
+                // NOTIFY USER (Using User Template)
+                sendProtocolEmail("template_8ajam7i", {
+                    subject: data.subject,
+                    reason: r,
+                    to_email: data.userEmail 
+                });
+
+                document.getElementById('back-btn').click();
+            };
 
             if(chatUnsubscribe) chatUnsubscribe();
             chatUnsubscribe = onSnapshot(query(collection(db, "tickets", id, "messages"), orderBy("timestamp", "asc")), snap => {
@@ -215,7 +257,7 @@
                 snap.forEach(mDoc => {
                     const m = mDoc.data();
                     const isMe = m.sender === auth.currentUser.email;
-                    box.innerHTML += `<div style="align-self:${isMe ? 'flex-end' : 'flex-start'}; background:${isMe ? 'var(--crimson)' : '#222'}; padding:8px 12px; border-radius:8px; max-width:80%; font-size:0.8rem;">
+                    box.innerHTML += `<div style="align-self:${isMe ? 'flex-end' : 'flex-start'}; background:${isMe ? 'var(--crimson)' : '#222'}; padding:8px 12px; border-radius:8px; max-width:80%; font-size:0.9rem;">
                         <small style="display:block; opacity:0.5; font-size:0.6rem;">${m.sender}</small>${m.text}</div>`;
                 });
                 box.scrollTop = box.scrollHeight;
@@ -240,14 +282,21 @@
 
         document.getElementById('ticket-form').onsubmit = async (e) => {
             e.preventDefault();
+            const subj = document.getElementById('ticket-subject').value;
+            const msg = document.getElementById('ticket-msg').value;
             await addDoc(collection(db, "tickets"), {
                 userId: auth.currentUser.uid,
                 userEmail: auth.currentUser.email,
-                subject: document.getElementById('ticket-subject').value,
-                message: document.getElementById('ticket-msg').value,
-                status: "Open",
-                timestamp: serverTimestamp()
+                subject: subj, message: msg, status: "Open", timestamp: serverTimestamp()
             });
+
+            // NOTIFY ADMIN (Using Admin Template)
+            sendProtocolEmail("template_mdz12kv", {
+                subject: subj,
+                message: msg,
+                userEmail: auth.currentUser.email
+            });
+
             document.getElementById('ticket-form').reset();
             fetchTickets();
         };
