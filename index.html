@@ -12,12 +12,12 @@
 
     <header>
         <div class="container header-container">
-            <h1 class="logo">CRIMSON<span>FLAME</span></h1>
+            <h1 class="logo" style="cursor:pointer;" onclick="routeTo('home')">CRIMSON<span>FLAME</span></h1>
             <nav>
                 <ul>
-                    <li><a href="?page=home" onclick="routeTo('home')">News</a></li>
-                    <li><a href="?page=tickets" onclick="routeTo('tickets')">Support</a></li>
-                    <li><a href="?page=login" id="nav-auth-link" onclick="routeTo('login')">Login</a></li>
+                    <li><a href="javascript:void(0)" onclick="routeTo('home')">News</a></li>
+                    <li><a href="javascript:void(0)" onclick="routeTo('tickets')">Support</a></li>
+                    <li><a href="javascript:void(0)" id="nav-auth-link" onclick="routeTo('login')">Login</a></li>
                 </ul>
             </nav>
         </div>
@@ -66,24 +66,24 @@
                         <h3>Create New Ticket</h3>
                         <form id="ticket-form">
                             <input type="text" id="ticket-subject" placeholder="Issue Subject" required>
-                            <textarea id="ticket-msg" placeholder="Describe the bug or issue..." rows="3" required></textarea>
+                            <textarea id="ticket-msg" placeholder="Describe the bug..." rows="3" required></textarea>
                             <button type="submit" class="btn-primary">Open Ticket</button>
                         </form>
                     </div>
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
                         <h3>Active Threads</h3>
-                        <button onclick="fetchTickets()" class="text-link" style="font-size:0.8rem;">Refresh List</button>
+                        <button onclick="fetchTickets()" class="text-link" style="font-size:0.8rem;">Refresh</button>
                     </div>
                     <div id="ticket-list"></div>
                 </div>
 
                 <div id="thread-view" class="auth-card" style="display:none; max-width:100%; text-align:left;">
-                    <button id="back-btn" class="text-link"><- Back to Threads</button>
+                    <button id="back-btn" class="text-link"><- Back</button>
                     <h2 id="active-subject" style="margin:15px 0 5px;"></h2>
                     <p id="active-status" style="font-size:0.8rem; margin-bottom:15px;"></p>
                     <div id="chat-box" style="height:300px; overflow-y:auto; display:flex; flex-direction:column; gap:10px; padding:10px; background:#000; border-radius:5px; margin-bottom:15px;"></div>
                     <form id="chat-form" style="display:flex; gap:10px;">
-                        <input type="text" id="chat-input" placeholder="Type message..." required>
+                        <input type="text" id="chat-input" placeholder="Message..." required>
                         <button type="submit" class="btn-primary">Send</button>
                     </form>
                     <button id="close-ticket-btn" class="btn-secondary" style="display:none; width:100%; margin-top:15px; border-color:orange; color:orange;">Close Ticket</button>
@@ -91,15 +91,15 @@
             </div>
             
             <div id="ticket-locked" style="text-align:center; padding:40px;">
-                <p>Login required to access support threads.</p>
-                <a href="?page=login" onclick="routeTo('login')" class="btn-primary" style="display:inline-block; text-decoration:none; margin-top:15px;">Login</a>
+                <p>Login required for support.</p>
+                <button onclick="routeTo('login')" class="btn-primary" style="margin-top:15px;">Login</button>
             </div>
         </section>
     </main>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, getDocs, query, orderBy, where, doc, onSnapshot, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
         const firebaseConfig = {
@@ -116,10 +116,12 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
+        setPersistence(auth, browserLocalPersistence);
+
         let activeTicketId = null;
         let chatUnsubscribe = null;
 
-        // --- NAVIGATION & ROUTING ---
+        // --- ROUTING ---
         window.routeTo = function(page) {
             const url = new URL(window.location);
             url.searchParams.set('page', page);
@@ -137,11 +139,10 @@
             if(page === 'tickets') {
                 document.getElementById('list-view').style.display = 'block';
                 document.getElementById('thread-view').style.display = 'none';
-                fetchTickets();
+                if(auth.currentUser) fetchTickets();
             }
         }
         window.addEventListener('popstate', navigate);
-        navigate();
 
         // --- NEWS ---
         async function fetchNews() {
@@ -171,22 +172,15 @@
         window.fetchTickets = async function() {
             if(!auth.currentUser) return;
             const list = document.getElementById('ticket-list');
-            list.innerHTML = "Syncing with grid...";
+            list.innerHTML = "Syncing...";
             
-            let q;
-            if(auth.currentUser.email === ADMIN_EMAIL) {
-                // Admin sees all tickets
-                q = query(collection(db, "tickets"), orderBy("timestamp", "desc"));
-            } else {
-                // Users see only their own tickets
+            let q = query(collection(db, "tickets"), orderBy("timestamp", "desc"));
+            if(auth.currentUser.email !== ADMIN_EMAIL) {
                 q = query(collection(db, "tickets"), where("userId", "==", auth.currentUser.uid), orderBy("timestamp", "desc"));
             }
             
             const snap = await getDocs(q);
             list.innerHTML = "";
-            if(snap.empty) {
-                list.innerHTML = "<p style='color:#777;'>No active threads found.</p>";
-            }
             snap.forEach(tDoc => {
                 const d = tDoc.data();
                 const item = document.createElement('div');
@@ -210,11 +204,8 @@
                 closeBtn.style.display = 'block';
                 closeBtn.onclick = async () => {
                     await updateDoc(doc(db, "tickets", id), { status: "Closed" });
-                    fetchTickets();
                     document.getElementById('back-btn').click();
                 };
-            } else {
-                closeBtn.style.display = 'none';
             }
 
             if(chatUnsubscribe) chatUnsubscribe();
@@ -224,8 +215,8 @@
                 snap.forEach(mDoc => {
                     const m = mDoc.data();
                     const isMe = m.sender === auth.currentUser.email;
-                    box.innerHTML += `<div style="align-self:${isMe ? 'flex-end' : 'flex-start'}; background:${isMe ? 'var(--crimson)' : '#222'}; padding:8px 12px; border-radius:8px; max-width:80%; font-size:0.9rem;">
-                        <small style="display:block; opacity:0.6; font-size:0.7rem;">${m.sender}</small>${m.text}</div>`;
+                    box.innerHTML += `<div style="align-self:${isMe ? 'flex-end' : 'flex-start'}; background:${isMe ? 'var(--crimson)' : '#222'}; padding:8px 12px; border-radius:8px; max-width:80%; font-size:0.8rem;">
+                        <small style="display:block; opacity:0.5; font-size:0.6rem;">${m.sender}</small>${m.text}</div>`;
                 });
                 box.scrollTop = box.scrollHeight;
             });
@@ -242,9 +233,7 @@
             e.preventDefault();
             const input = document.getElementById('chat-input');
             await addDoc(collection(db, "tickets", activeTicketId, "messages"), {
-                text: input.value,
-                sender: auth.currentUser.email,
-                timestamp: serverTimestamp()
+                text: input.value, sender: auth.currentUser.email, timestamp: serverTimestamp()
             });
             input.value = "";
         };
@@ -273,9 +262,6 @@
                 document.getElementById('ticket-locked').style.display = 'none';
                 document.getElementById('ticket-system').style.display = 'block';
                 if(user.email === ADMIN_EMAIL) document.getElementById('admin-panel').style.display = 'block';
-                
-                // If we are on the tickets page, load them
-                if(new URLSearchParams(window.location.search).get('page') === 'tickets') fetchTickets();
             } else {
                 nav.innerText = "Login";
                 document.getElementById('login-container').style.display = 'block';
@@ -283,12 +269,13 @@
                 document.getElementById('ticket-locked').style.display = 'block';
                 document.getElementById('ticket-system').style.display = 'none';
             }
+            navigate();
         });
 
         let isLogin = true;
         document.getElementById('toggle-auth').onclick = () => {
             isLogin = !isLogin;
-            document.getElementById('auth-title').innerText = isLogin ? "Agent Login" : "Register Agent";
+            document.getElementById('auth-title').innerText = isLogin ? "Agent Login" : "Register";
             document.getElementById('toggle-auth').innerText = isLogin ? "Register" : "Login";
         };
 
@@ -297,12 +284,10 @@
             const email = document.getElementById('email').value;
             const pass = document.getElementById('password').value;
             if(isLogin) signInWithEmailAndPassword(auth, email, pass).catch(err => alert(err.message));
-            else createUserWithEmailAndPassword(auth, email, pass).then(() => routeTo('home')).catch(err => alert(err.message));
+            else createUserWithEmailAndPassword(auth, email, pass).catch(err => alert(err.message));
         };
 
-        document.getElementById('logout-btn').onclick = () => {
-            signOut(auth).then(() => routeTo('home'));
-        };
+        document.getElementById('logout-btn').onclick = () => signOut(auth);
     </script>
 </body>
 </html>
