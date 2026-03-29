@@ -24,8 +24,8 @@
     </header>
 
     <main id="page-home" class="page-content">
-        <section class="hero"><div class="container"><h2>News Feed</h2></div></section>
-        <section class="container"><div id="news-feed">Loading grid...</div></section>
+        <section class="hero"><div class="container"><h2>Grid Updates</h2></div></section>
+        <section class="container"><div id="news-feed">Initialising news...</div></section>
     </main>
 
     <main id="page-login" class="page-content" style="display:none;">
@@ -36,18 +36,18 @@
                     <form id="login-form">
                         <input type="email" id="email" placeholder="Email" required>
                         <input type="password" id="password" placeholder="Password" required>
-                        <button type="submit" class="btn-primary">Initialize</button>
+                        <button type="submit" class="btn-primary">Connect</button>
                     </form>
-                    <p class="toggle-text">Need clearance? <span id="toggle-auth" class="text-link">Register</span></p>
+                    <p class="toggle-text">No clearance? <span id="toggle-auth" class="text-link">Register</span></p>
                 </div>
                 <div id="dashboard" style="display:none;">
                     <h3>Welcome back, Agent.</h3>
-                    <div id="admin-panel" style="display:none;">
-                        <hr><p style="color:var(--crimson)">ADMIN CONSOLE ACTIVE</p>
+                    <div id="admin-panel" style="display:none; border-top: 1px solid #333; margin-top:20px;">
+                        <p style="color:var(--crimson); margin:10px 0;">[ADMIN CONSOLE ACTIVE]</p>
                         <form id="news-form">
                             <input type="text" id="news-title" placeholder="Update Title" required>
-                            <textarea id="news-body" placeholder="Markdown content..." rows="5" required></textarea>
-                            <button type="submit" class="btn-primary">Publish Update</button>
+                            <textarea id="news-body" placeholder="Markdown content..." rows="4" required></textarea>
+                            <button type="submit" class="btn-primary">Publish to Grid</button>
                         </form>
                     </div>
                     <button id="logout-btn" class="btn-secondary">Disconnect</button>
@@ -58,24 +58,38 @@
 
     <main id="page-tickets" class="page-content" style="display:none;">
         <section class="container" style="padding-top:40px;">
-            <h2 class="section-title">Support Tickets</h2>
-            <div id="ticket-auth-check">
-                <p>You must be logged in to access the Support Protocol.</p>
-                <a href="?page=login" class="btn-primary" style="display:inline-block; text-decoration:none;">Go to Login</a>
-            </div>
+            <h2 class="section-title">Support Protocol</h2>
             
             <div id="ticket-system" style="display:none;">
-                <div class="auth-card" style="max-width:100%; text-align:left;">
-                    <h3>Open a New Ticket</h3>
-                    <form id="ticket-form">
-                        <input type="text" id="ticket-subject" placeholder="Subject (e.g., Cosmetic missing)" required>
-                        <textarea id="ticket-msg" placeholder="Describe your issue..." rows="3" required></textarea>
-                        <button type="submit" class="btn-primary">Submit Ticket</button>
-                    </form>
+                <div id="list-view">
+                    <div class="auth-card" style="max-width:100%; text-align:left; margin-bottom:20px;">
+                        <h3>Create New Ticket</h3>
+                        <form id="ticket-form">
+                            <input type="text" id="ticket-subject" placeholder="Issue Subject" required>
+                            <textarea id="ticket-msg" placeholder="Describe the bug or issue..." rows="3" required></textarea>
+                            <button type="submit" class="btn-primary">Open Ticket</button>
+                        </form>
+                    </div>
+                    <h3>Active Threads</h3>
+                    <div id="ticket-list"></div>
                 </div>
-                <br>
-                <h3>Your Tickets</h3>
-                <div id="ticket-list">Loading tickets...</div>
+
+                <div id="thread-view" class="auth-card" style="display:none; max-width:100%; text-align:left;">
+                    <button id="back-btn" class="text-link"><- Back to Threads</button>
+                    <h2 id="active-subject" style="margin:15px 0 5px;"></h2>
+                    <p id="active-status" style="font-size:0.8rem; margin-bottom:15px;"></p>
+                    <div id="chat-box" style="height:300px; overflow-y:auto; display:flex; flex-direction:column; gap:10px; padding:10px; background:#000; border-radius:5px; margin-bottom:15px;"></div>
+                    <form id="chat-form" style="display:flex; gap:10px;">
+                        <input type="text" id="chat-input" placeholder="Type message..." required>
+                        <button type="submit" class="btn-primary">Send</button>
+                    </form>
+                    <button id="close-ticket-btn" class="btn-secondary" style="display:none; width:100%; margin-top:15px; border-color:orange; color:orange;">Close Ticket</button>
+                </div>
+            </div>
+            
+            <div id="ticket-locked" style="text-align:center; padding:40px;">
+                <p>Login required to access support threads.</p>
+                <a href="?page=login" class="btn-primary" style="display:inline-block; text-decoration:none; margin-top:15px;">Login</a>
             </div>
         </section>
     </main>
@@ -83,7 +97,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, getDocs, query, orderBy, where } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, getDocs, query, orderBy, where, doc, onSnapshot, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBSSJKDrFJ1_qlliZqgw34CY2TSaKOxxxM",
@@ -99,65 +113,113 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        // --- ROUTING LOGIC ---
-        function route() {
-            const params = new URLSearchParams(window.location.search);
-            const page = params.get('page') || 'home';
-            document.querySelectorAll('.page-content').forEach(p => p.style.display = 'none');
-            const target = document.getElementById('page-' + page);
-            if (target) target.style.display = 'block';
-            if (page === 'home') loadNews();
-            if (page === 'tickets') loadTickets();
-        }
-        window.onpopstate = route;
-        route();
+        let activeTicketId = null;
+        let chatUnsubscribe = null;
 
-        // --- NEWS LOGIC ---
-        async function loadNews() {
+        // --- NAVIGATION ---
+        function navigate() {
+            const page = new URLSearchParams(window.location.search).get('page') || 'home';
+            document.querySelectorAll('.page-content').forEach(p => p.style.display = 'none');
+            document.getElementById('page-' + page).style.display = 'block';
+            if(page === 'home') fetchNews();
+            if(page === 'tickets') fetchTickets();
+        }
+        window.addEventListener('popstate', navigate);
+        navigate();
+
+        // --- NEWS ---
+        async function fetchNews() {
             const q = query(collection(db, "news"), orderBy("timestamp", "desc"));
             const snap = await getDocs(q);
             const feed = document.getElementById('news-feed');
             feed.innerHTML = "";
-            snap.forEach(doc => {
-                const data = doc.data();
+            snap.forEach(d => {
+                const data = d.data();
                 feed.innerHTML += `<article class="news-card"><span class="news-date">${data.date}</span><h3>${data.title}</h3><div>${marked.parse(data.body)}</div></article>`;
             });
         }
 
-        document.getElementById('news-form').addEventListener('submit', async (e) => {
+        document.getElementById('news-form').onsubmit = async (e) => {
             e.preventDefault();
             await addDoc(collection(db, "news"), {
                 title: document.getElementById('news-title').value,
                 body: document.getElementById('news-body').value,
                 date: new Date().toLocaleDateString(),
-                timestamp: new Date()
+                timestamp: serverTimestamp()
             });
-            alert("Published!");
-            loadNews();
-        });
+            document.getElementById('news-form').reset();
+            fetchNews();
+        };
 
-        // --- TICKET LOGIC ---
-        async function loadTickets() {
-            if (!auth.currentUser) return;
-            const container = document.getElementById('ticket-list');
-            // If admin, show everything. If user, show only theirs.
+        // --- TICKETS ---
+        async function fetchTickets() {
+            if(!auth.currentUser) return;
+            const list = document.getElementById('ticket-list');
             let q = query(collection(db, "tickets"), orderBy("timestamp", "desc"));
-            if (auth.currentUser.email !== ADMIN_EMAIL) {
+            if(auth.currentUser.email !== ADMIN_EMAIL) {
                 q = query(collection(db, "tickets"), where("userId", "==", auth.currentUser.uid), orderBy("timestamp", "desc"));
             }
             const snap = await getDocs(q);
-            container.innerHTML = "";
-            snap.forEach(doc => {
-                const d = doc.data();
-                container.innerHTML += `<div class="news-card" style="padding:20px;">
-                    <strong>${d.subject}</strong> <small>(${d.status})</small><br>
-                    <p style="font-size:0.9rem">${d.message}</p>
-                    <small>From: ${d.userEmail}</small>
-                </div>`;
+            list.innerHTML = "";
+            snap.forEach(tDoc => {
+                const d = tDoc.data();
+                const item = document.createElement('div');
+                item.className = "news-card";
+                item.style.cursor = "pointer";
+                item.innerHTML = `<strong>${d.subject}</strong> <span style="float:right; color:${d.status === 'Open' ? '#0f0' : '#777'}">${d.status}</span><br><small>${d.userEmail}</small>`;
+                item.onclick = () => openThread(tDoc.id, d);
+                list.appendChild(item);
             });
         }
 
-        document.getElementById('ticket-form').addEventListener('submit', async (e) => {
+        function openThread(id, data) {
+            activeTicketId = id;
+            document.getElementById('list-view').style.display = 'none';
+            document.getElementById('thread-view').style.display = 'block';
+            document.getElementById('active-subject').innerText = data.subject;
+            document.getElementById('active-status').innerText = "Status: " + data.status;
+
+            if(auth.currentUser.email === ADMIN_EMAIL) {
+                const btn = document.getElementById('close-ticket-btn');
+                btn.style.display = 'block';
+                btn.onclick = async () => {
+                    await updateDoc(doc(db, "tickets", id), { status: "Closed" });
+                    location.reload();
+                };
+            }
+
+            if(chatUnsubscribe) chatUnsubscribe();
+            chatUnsubscribe = onSnapshot(query(collection(db, "tickets", id, "messages"), orderBy("timestamp", "asc")), snap => {
+                const box = document.getElementById('chat-box');
+                box.innerHTML = "";
+                snap.forEach(mDoc => {
+                    const m = mDoc.data();
+                    const isMe = m.sender === auth.currentUser.email;
+                    box.innerHTML += `<div style="align-self:${isMe ? 'flex-end' : 'flex-start'}; background:${isMe ? 'var(--crimson)' : '#222'}; padding:8px 12px; border-radius:8px; max-width:80%; font-size:0.9rem;">
+                        <small style="display:block; opacity:0.6; font-size:0.7rem;">${m.sender}</small>${m.text}</div>`;
+                });
+                box.scrollTop = box.scrollHeight;
+            });
+        }
+
+        document.getElementById('back-btn').onclick = () => {
+            document.getElementById('list-view').style.display = 'block';
+            document.getElementById('thread-view').style.display = 'none';
+            if(chatUnsubscribe) chatUnsubscribe();
+        };
+
+        document.getElementById('chat-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const input = document.getElementById('chat-input');
+            await addDoc(collection(db, "tickets", activeTicketId, "messages"), {
+                text: input.value,
+                sender: auth.currentUser.email,
+                timestamp: serverTimestamp()
+            });
+            input.value = "";
+        };
+
+        document.getElementById('ticket-form').onsubmit = async (e) => {
             e.preventDefault();
             await addDoc(collection(db, "tickets"), {
                 userId: auth.currentUser.uid,
@@ -165,38 +227,35 @@
                 subject: document.getElementById('ticket-subject').value,
                 message: document.getElementById('ticket-msg').value,
                 status: "Open",
-                timestamp: new Date()
+                timestamp: serverTimestamp()
             });
-            alert("Ticket Submitted!");
             document.getElementById('ticket-form').reset();
-            loadTickets();
-        });
+            fetchTickets();
+        };
 
-        // --- AUTH LOGIC ---
-        onAuthStateChanged(auth, (user) => {
-            const navLink = document.getElementById('nav-auth-link');
-            if (user) {
-                navLink.innerText = "Dashboard";
+        // --- AUTH ---
+        onAuthStateChanged(auth, user => {
+            const nav = document.getElementById('nav-auth-link');
+            if(user) {
+                nav.innerText = "Dashboard";
                 document.getElementById('login-container').style.display = 'none';
                 document.getElementById('dashboard').style.display = 'block';
-                document.getElementById('ticket-auth-check').style.display = 'none';
+                document.getElementById('ticket-locked').style.display = 'none';
                 document.getElementById('ticket-system').style.display = 'block';
-                if (user.email === ADMIN_EMAIL) document.getElementById('admin-panel').style.display = 'block';
+                if(user.email === ADMIN_EMAIL) document.getElementById('admin-panel').style.display = 'block';
             } else {
-                navLink.innerText = "Login";
+                nav.innerText = "Login";
                 document.getElementById('login-container').style.display = 'block';
                 document.getElementById('dashboard').style.display = 'none';
-                document.getElementById('ticket-auth-check').style.display = 'block';
+                document.getElementById('ticket-locked').style.display = 'block';
                 document.getElementById('ticket-system').style.display = 'none';
             }
-            route(); // Refresh page state
         });
 
-        // Handle Login/Register Forms (Standard Firebase stuff)
         let isLogin = true;
         document.getElementById('toggle-auth').onclick = () => {
             isLogin = !isLogin;
-            document.getElementById('auth-title').innerText = isLogin ? "Agent Login" : "Clearance Request";
+            document.getElementById('auth-title').innerText = isLogin ? "Agent Login" : "Register Agent";
             document.getElementById('toggle-auth').innerText = isLogin ? "Register" : "Login";
         };
 
@@ -204,7 +263,7 @@
             e.preventDefault();
             const email = document.getElementById('email').value;
             const pass = document.getElementById('password').value;
-            if (isLogin) signInWithEmailAndPassword(auth, email, pass).catch(err => alert(err.message));
+            if(isLogin) signInWithEmailAndPassword(auth, email, pass).catch(err => alert(err.message));
             else createUserWithEmailAndPassword(auth, email, pass).catch(err => alert(err.message));
         };
 
