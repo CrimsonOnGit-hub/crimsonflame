@@ -3,87 +3,87 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CrimsonFlame | Official Site</title>
+    <title>CrimsonFlame | Protocol</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
-    
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
 
     <header>
         <div class="container header-container">
-            <h1 class="logo">Crimson<span>Flame</span></h1>
+            <h1 class="logo">CRIMSON<span>FLAME</span></h1>
             <nav>
                 <ul>
-                    <li><a href="#home">Home</a></li>
-                    <li><a href="#news">Newest News</a></li>
-                    <li><a href="#auth-section">Sign in</a></li>
+                    <li><a href="?page=home">News</a></li>
+                    <li><a href="?page=tickets">Support</a></li>
+                    <li><a href="?page=login" id="nav-auth-link">Login</a></li>
                 </ul>
             </nav>
         </div>
     </header>
 
-    <section id="home" class="hero">
-        <div class="container">
-            <h2>Forging New Realities.</h2>
-            <p>Welcome to the official home of CrimsonFlame. We make VR games.</p>
-        </div>
-    </section>
+    <main id="page-home" class="page-content">
+        <section class="hero"><div class="container"><h2>News Feed</h2></div></section>
+        <section class="container"><div id="news-feed">Loading grid...</div></section>
+    </main>
 
-    <section id="news" class="news-section">
-        <div class="container">
-            <h2 class="section-title">Newest News</h2>
-            <div id="news-feed">
-                <p style="color: var(--text-muted);">Loading...</p>
+    <main id="page-login" class="page-content" style="display:none;">
+        <section class="auth-container">
+            <div class="auth-card">
+                <div id="login-container">
+                    <h2 id="auth-title">Agent Login</h2>
+                    <form id="login-form">
+                        <input type="email" id="email" placeholder="Email" required>
+                        <input type="password" id="password" placeholder="Password" required>
+                        <button type="submit" class="btn-primary">Initialize</button>
+                    </form>
+                    <p class="toggle-text">Need clearance? <span id="toggle-auth" class="text-link">Register</span></p>
+                </div>
+                <div id="dashboard" style="display:none;">
+                    <h3>Welcome back, Agent.</h3>
+                    <div id="admin-panel" style="display:none;">
+                        <hr><p style="color:var(--crimson)">ADMIN CONSOLE ACTIVE</p>
+                        <form id="news-form">
+                            <input type="text" id="news-title" placeholder="Update Title" required>
+                            <textarea id="news-body" placeholder="Markdown content..." rows="5" required></textarea>
+                            <button type="submit" class="btn-primary">Publish Update</button>
+                        </form>
+                    </div>
+                    <button id="logout-btn" class="btn-secondary">Disconnect</button>
+                </div>
             </div>
-        </div>
-    </section>
+        </section>
+    </main>
 
-    <section id="auth-section" class="auth-container">
-        <div class="auth-card">
+    <main id="page-tickets" class="page-content" style="display:none;">
+        <section class="container" style="padding-top:40px;">
+            <h2 class="section-title">Support Tickets</h2>
+            <div id="ticket-auth-check">
+                <p>You must be logged in to access the Support Protocol.</p>
+                <a href="?page=login" class="btn-primary" style="display:inline-block; text-decoration:none;">Go to Login</a>
+            </div>
             
-            <div id="login-container">
-                <h2 id="auth-title">Agent Login</h2>
-                <p id="auth-message">Access the Crimson Protocol dashboard.</p>
-                <form id="login-form">
-                    <input type="email" id="email" placeholder="Email Address" required>
-                    <input type="password" id="password" placeholder="Password" required>
-                    <button type="submit" id="submit-btn" class="btn-primary">Initialize Login</button>
-                </form>
-                <p class="toggle-text">
-                    Don't have clearance? <span id="toggle-auth" class="text-link">Register here</span>
-                </p>
+            <div id="ticket-system" style="display:none;">
+                <div class="auth-card" style="max-width:100%; text-align:left;">
+                    <h3>Open a New Ticket</h3>
+                    <form id="ticket-form">
+                        <input type="text" id="ticket-subject" placeholder="Subject (e.g., Cosmetic missing)" required>
+                        <textarea id="ticket-msg" placeholder="Describe your issue..." rows="3" required></textarea>
+                        <button type="submit" class="btn-primary">Submit Ticket</button>
+                    </form>
+                </div>
+                <br>
+                <h3>Your Tickets</h3>
+                <div id="ticket-list">Loading tickets...</div>
             </div>
-
-            <div id="dashboard" style="display: none;">
-                <h3 style="color: var(--crimson);">Welcome back, Agent.</h3>
-                <p>Your connection to the protocol is secure.</p>
-                <button id="logout-btn" class="btn-secondary">Disconnect</button>
-            </div>
-
-            <div id="admin-panel" style="display: none; margin-top: 30px; padding-top: 20px; border-top: 1px solid #333;">
-                <h3 style="color: #fff; margin-bottom: 15px;">Admin Control Panel</h3>
-                <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 10px;">Use Markdown (# Title, **Bold**, - Bullet)</p>
-                <form id="news-form">
-                    <input type="text" id="news-title" placeholder="Update Title" required>
-                    <textarea id="news-body" placeholder="Type update here..." rows="8" required></textarea>
-                    <button type="submit" class="btn-primary" style="width: 100%;">Publish to Grid</button>
-                </form>
-            </div>
-        </div>
-    </section>
-
-    <footer>
-        <div class="container">
-            <p>&copy; 2026 CrimsonFlame. All rights reserved.</p>
-        </div>
-    </footer>
+        </section>
+    </main>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, getDocs, query, orderBy, where } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBSSJKDrFJ1_qlliZqgw34CY2TSaKOxxxM",
@@ -91,91 +91,124 @@
             projectId: "crimsonflame-8169e",
             storageBucket: "crimsonflame-8169e.firebasestorage.app",
             messagingSenderId: "406321213530",
-            appId: "1:406321213530:web:92d27a69d34d147393a863",
-            measurementId: "G-TRK3848V9Q"
+            appId: "1:406321213530:web:92d27a69d34d147393a863"
         };
 
-        // --- EDIT THIS LINE ---
-        const ADMIN_EMAIL = "allaboutwaterdiamond@gmail.com"; 
-
+        const ADMIN_EMAIL = "allaboutwaterdiamond@gmail.com";
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        const loginContainer = document.getElementById('login-container');
-        const loginForm = document.getElementById('login-form');
-        const dashboard = document.getElementById('dashboard');
-        const adminPanel = document.getElementById('admin-panel');
-        const newsForm = document.getElementById('news-form');
-        const newsFeed = document.getElementById('news-feed');
+        // --- ROUTING LOGIC ---
+        function route() {
+            const params = new URLSearchParams(window.location.search);
+            const page = params.get('page') || 'home';
+            document.querySelectorAll('.page-content').forEach(p => p.style.display = 'none');
+            const target = document.getElementById('page-' + page);
+            if (target) target.style.display = 'block';
+            if (page === 'home') loadNews();
+            if (page === 'tickets') loadTickets();
+        }
+        window.onpopstate = route;
+        route();
 
+        // --- NEWS LOGIC ---
         async function loadNews() {
-            try {
-                const q = query(collection(db, "news"), orderBy("timestamp", "desc"));
-                const querySnapshot = await getDocs(q);
-                newsFeed.innerHTML = ""; 
-                if (querySnapshot.empty) {
-                    newsFeed.innerHTML = "<p style='color: var(--text-muted);'>No recent updates from the grid.</p>";
-                    return;
-                }
-                querySnapshot.forEach((doc) => {
-                    const data = doc.data();
-                    const formattedBody = marked.parse(data.body); // Converts Markdown to HTML
-                    newsFeed.innerHTML += `
-                        <article class="news-card" style="margin-bottom: 30px;">
-                            <span class="news-date">${data.date}</span>
-                            <h3>${data.title}</h3>
-                            <div class="news-content">${formattedBody}</div>
-                        </article>`;
-                });
-            } catch (err) { newsFeed.innerHTML = "<p style='color: red;'>Connection Error.</p>"; }
+            const q = query(collection(db, "news"), orderBy("timestamp", "desc"));
+            const snap = await getDocs(q);
+            const feed = document.getElementById('news-feed');
+            feed.innerHTML = "";
+            snap.forEach(doc => {
+                const data = doc.data();
+                feed.innerHTML += `<article class="news-card"><span class="news-date">${data.date}</span><h3>${data.title}</h3><div>${marked.parse(data.body)}</div></article>`;
+            });
         }
 
-        loadNews();
-
-        newsForm.addEventListener('submit', async (e) => {
+        document.getElementById('news-form').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const title = document.getElementById('news-title').value;
-            const body = document.getElementById('news-body').value;
-            try {
-                await addDoc(collection(db, "news"), {
-                    title, body, date: new Date().toLocaleDateString(), timestamp: new Date()
-                });
-                alert("Published!");
-                newsForm.reset();
-                loadNews();
-            } catch (err) { alert("Access Denied."); }
+            await addDoc(collection(db, "news"), {
+                title: document.getElementById('news-title').value,
+                body: document.getElementById('news-body').value,
+                date: new Date().toLocaleDateString(),
+                timestamp: new Date()
+            });
+            alert("Published!");
+            loadNews();
         });
 
-        let isLoginMode = true;
-        document.getElementById('toggle-auth').addEventListener('click', () => {
-            isLoginMode = !isLoginMode;
-            document.getElementById('auth-title').innerText = isLoginMode ? "Agent Login" : "Request Clearance";
-            document.getElementById('submit-btn').innerText = isLoginMode ? "Initialize Login" : "Register Account";
-            document.getElementById('toggle-auth').innerText = isLoginMode ? "Register here" : "Login here";
+        // --- TICKET LOGIC ---
+        async function loadTickets() {
+            if (!auth.currentUser) return;
+            const container = document.getElementById('ticket-list');
+            // If admin, show everything. If user, show only theirs.
+            let q = query(collection(db, "tickets"), orderBy("timestamp", "desc"));
+            if (auth.currentUser.email !== ADMIN_EMAIL) {
+                q = query(collection(db, "tickets"), where("userId", "==", auth.currentUser.uid), orderBy("timestamp", "desc"));
+            }
+            const snap = await getDocs(q);
+            container.innerHTML = "";
+            snap.forEach(doc => {
+                const d = doc.data();
+                container.innerHTML += `<div class="news-card" style="padding:20px;">
+                    <strong>${d.subject}</strong> <small>(${d.status})</small><br>
+                    <p style="font-size:0.9rem">${d.message}</p>
+                    <small>From: ${d.userEmail}</small>
+                </div>`;
+            });
+        }
+
+        document.getElementById('ticket-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await addDoc(collection(db, "tickets"), {
+                userId: auth.currentUser.uid,
+                userEmail: auth.currentUser.email,
+                subject: document.getElementById('ticket-subject').value,
+                message: document.getElementById('ticket-msg').value,
+                status: "Open",
+                timestamp: new Date()
+            });
+            alert("Ticket Submitted!");
+            document.getElementById('ticket-form').reset();
+            loadTickets();
         });
 
-        loginForm.addEventListener('submit', (e) => {
+        // --- AUTH LOGIC ---
+        onAuthStateChanged(auth, (user) => {
+            const navLink = document.getElementById('nav-auth-link');
+            if (user) {
+                navLink.innerText = "Dashboard";
+                document.getElementById('login-container').style.display = 'none';
+                document.getElementById('dashboard').style.display = 'block';
+                document.getElementById('ticket-auth-check').style.display = 'none';
+                document.getElementById('ticket-system').style.display = 'block';
+                if (user.email === ADMIN_EMAIL) document.getElementById('admin-panel').style.display = 'block';
+            } else {
+                navLink.innerText = "Login";
+                document.getElementById('login-container').style.display = 'block';
+                document.getElementById('dashboard').style.display = 'none';
+                document.getElementById('ticket-auth-check').style.display = 'block';
+                document.getElementById('ticket-system').style.display = 'none';
+            }
+            route(); // Refresh page state
+        });
+
+        // Handle Login/Register Forms (Standard Firebase stuff)
+        let isLogin = true;
+        document.getElementById('toggle-auth').onclick = () => {
+            isLogin = !isLogin;
+            document.getElementById('auth-title').innerText = isLogin ? "Agent Login" : "Clearance Request";
+            document.getElementById('toggle-auth').innerText = isLogin ? "Register" : "Login";
+        };
+
+        document.getElementById('login-form').onsubmit = (e) => {
             e.preventDefault();
             const email = document.getElementById('email').value;
             const pass = document.getElementById('password').value;
-            if (isLoginMode) signInWithEmailAndPassword(auth, email, pass).catch(err => alert(err.message));
-            else createUserWithEmailAndPassword(auth, email, pass).then(() => alert("Created!")).catch(err => alert(err.message));
-        });
+            if (isLogin) signInWithEmailAndPassword(auth, email, pass).catch(err => alert(err.message));
+            else createUserWithEmailAndPassword(auth, email, pass).catch(err => alert(err.message));
+        };
 
-        document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
-
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                loginContainer.style.display = 'none';
-                dashboard.style.display = 'block';
-                if (user.email === ADMIN_EMAIL) adminPanel.style.display = 'block';
-            } else {
-                loginContainer.style.display = 'block';
-                dashboard.style.display = 'none';
-                adminPanel.style.display = 'none';
-            }
-        });
+        document.getElementById('logout-btn').onclick = () => signOut(auth);
     </script>
 </body>
 </html>
