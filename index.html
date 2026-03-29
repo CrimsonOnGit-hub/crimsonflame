@@ -15,9 +15,9 @@
             <h1 class="logo">CRIMSON<span>FLAME</span></h1>
             <nav>
                 <ul>
-                    <li><a href="?page=home">News</a></li>
-                    <li><a href="?page=tickets">Support</a></li>
-                    <li><a href="?page=login" id="nav-auth-link">Login</a></li>
+                    <li><a href="?page=home" onclick="routeTo('home')">News</a></li>
+                    <li><a href="?page=tickets" onclick="routeTo('tickets')">Support</a></li>
+                    <li><a href="?page=login" id="nav-auth-link" onclick="routeTo('login')">Login</a></li>
                 </ul>
             </nav>
         </div>
@@ -70,7 +70,10 @@
                             <button type="submit" class="btn-primary">Open Ticket</button>
                         </form>
                     </div>
-                    <h3>Active Threads</h3>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                        <h3>Active Threads</h3>
+                        <button onclick="fetchTickets()" class="text-link" style="font-size:0.8rem;">Refresh List</button>
+                    </div>
                     <div id="ticket-list"></div>
                 </div>
 
@@ -89,7 +92,7 @@
             
             <div id="ticket-locked" style="text-align:center; padding:40px;">
                 <p>Login required to access support threads.</p>
-                <a href="?page=login" class="btn-primary" style="display:inline-block; text-decoration:none; margin-top:15px;">Login</a>
+                <a href="?page=login" onclick="routeTo('login')" class="btn-primary" style="display:inline-block; text-decoration:none; margin-top:15px;">Login</a>
             </div>
         </section>
     </main>
@@ -116,13 +119,26 @@
         let activeTicketId = null;
         let chatUnsubscribe = null;
 
-        // --- NAVIGATION ---
+        // --- NAVIGATION & ROUTING ---
+        window.routeTo = function(page) {
+            const url = new URL(window.location);
+            url.searchParams.set('page', page);
+            window.history.pushState({}, '', url);
+            navigate();
+        };
+
         function navigate() {
             const page = new URLSearchParams(window.location.search).get('page') || 'home';
             document.querySelectorAll('.page-content').forEach(p => p.style.display = 'none');
-            document.getElementById('page-' + page).style.display = 'block';
+            const target = document.getElementById('page-' + page);
+            if(target) target.style.display = 'block';
+            
             if(page === 'home') fetchNews();
-            if(page === 'tickets') fetchTickets();
+            if(page === 'tickets') {
+                document.getElementById('list-view').style.display = 'block';
+                document.getElementById('thread-view').style.display = 'none';
+                fetchTickets();
+            }
         }
         window.addEventListener('popstate', navigate);
         navigate();
@@ -152,15 +168,25 @@
         };
 
         // --- TICKETS ---
-        async function fetchTickets() {
+        window.fetchTickets = async function() {
             if(!auth.currentUser) return;
             const list = document.getElementById('ticket-list');
-            let q = query(collection(db, "tickets"), orderBy("timestamp", "desc"));
-            if(auth.currentUser.email !== ADMIN_EMAIL) {
+            list.innerHTML = "Syncing with grid...";
+            
+            let q;
+            if(auth.currentUser.email === ADMIN_EMAIL) {
+                // Admin sees all tickets
+                q = query(collection(db, "tickets"), orderBy("timestamp", "desc"));
+            } else {
+                // Users see only their own tickets
                 q = query(collection(db, "tickets"), where("userId", "==", auth.currentUser.uid), orderBy("timestamp", "desc"));
             }
+            
             const snap = await getDocs(q);
             list.innerHTML = "";
+            if(snap.empty) {
+                list.innerHTML = "<p style='color:#777;'>No active threads found.</p>";
+            }
             snap.forEach(tDoc => {
                 const d = tDoc.data();
                 const item = document.createElement('div');
@@ -179,13 +205,16 @@
             document.getElementById('active-subject').innerText = data.subject;
             document.getElementById('active-status').innerText = "Status: " + data.status;
 
+            const closeBtn = document.getElementById('close-ticket-btn');
             if(auth.currentUser.email === ADMIN_EMAIL) {
-                const btn = document.getElementById('close-ticket-btn');
-                btn.style.display = 'block';
-                btn.onclick = async () => {
+                closeBtn.style.display = 'block';
+                closeBtn.onclick = async () => {
                     await updateDoc(doc(db, "tickets", id), { status: "Closed" });
-                    location.reload();
+                    fetchTickets();
+                    document.getElementById('back-btn').click();
                 };
+            } else {
+                closeBtn.style.display = 'none';
             }
 
             if(chatUnsubscribe) chatUnsubscribe();
@@ -206,6 +235,7 @@
             document.getElementById('list-view').style.display = 'block';
             document.getElementById('thread-view').style.display = 'none';
             if(chatUnsubscribe) chatUnsubscribe();
+            fetchTickets();
         };
 
         document.getElementById('chat-form').onsubmit = async (e) => {
@@ -243,6 +273,9 @@
                 document.getElementById('ticket-locked').style.display = 'none';
                 document.getElementById('ticket-system').style.display = 'block';
                 if(user.email === ADMIN_EMAIL) document.getElementById('admin-panel').style.display = 'block';
+                
+                // If we are on the tickets page, load them
+                if(new URLSearchParams(window.location.search).get('page') === 'tickets') fetchTickets();
             } else {
                 nav.innerText = "Login";
                 document.getElementById('login-container').style.display = 'block';
@@ -264,10 +297,12 @@
             const email = document.getElementById('email').value;
             const pass = document.getElementById('password').value;
             if(isLogin) signInWithEmailAndPassword(auth, email, pass).catch(err => alert(err.message));
-            else createUserWithEmailAndPassword(auth, email, pass).catch(err => alert(err.message));
+            else createUserWithEmailAndPassword(auth, email, pass).then(() => routeTo('home')).catch(err => alert(err.message));
         };
 
-        document.getElementById('logout-btn').onclick = () => signOut(auth);
+        document.getElementById('logout-btn').onclick = () => {
+            signOut(auth).then(() => routeTo('home'));
+        };
     </script>
 </body>
 </html>
