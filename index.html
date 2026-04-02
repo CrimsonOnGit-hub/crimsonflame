@@ -23,6 +23,7 @@
             <nav>
                 <ul>
                     <li><a href="javascript:void(0)" onclick="routeTo('home')">News</a></li>
+                    <li><a href="javascript:void(0)" onclick="openChatter()">Chatter</a></li>
                     <li><a href="javascript:void(0)" onclick="routeTo('tickets')">Support</a></li>
                     <li><a href="javascript:void(0)" id="nav-auth-link" onclick="routeTo('login')">Login</a></li>
                 </ul>
@@ -138,6 +139,15 @@
         let activeTicketId = null;
         let chatUnsubscribe = null;
 
+        // --- CHATTER POPUP ---
+        window.openChatter = function() {
+            const w = 420;
+            const h = 600;
+            const left = (screen.width/2)-(w/2);
+            const top = (screen.height/2)-(h/2);
+            window.open('Chatter.html', 'Chatter', `width=${w},height=${h},top=${top},left=${left},resizable=no`);
+        };
+
         // --- EMAIL HELPERS ---
         function sendProtocolEmail(templateId, params) {
             emailjs.send("service_ka3dbxo", templateId, params)
@@ -240,7 +250,6 @@
                 if(!r) return alert("Resolution required.");
                 await updateDoc(doc(db, "tickets", id), { status: "Closed", closeReason: r });
                 
-                // NOTIFY USER (Using User Template)
                 sendProtocolEmail("template_8ajam7i", {
                     subject: data.subject,
                     reason: r,
@@ -290,7 +299,6 @@
                 subject: subj, message: msg, status: "Open", timestamp: serverTimestamp()
             });
 
-            // NOTIFY ADMIN (Using Admin Template)
             sendProtocolEmail("template_mdz12kv", {
                 subject: subj,
                 message: msg,
