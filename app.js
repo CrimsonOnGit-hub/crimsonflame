@@ -1,7 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence, updateProfile } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, query, orderBy, where, doc, onSnapshot, updateDoc, serverTimestamp, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-storage.js";
+import { getFirestore, collection, addDoc, getDocs, getDoc, query, orderBy, where, doc, onSnapshot, updateDoc, serverTimestamp, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyBSSJKDrFJ1_qlliZqgw34CY2TSaKOxxxM",
@@ -15,10 +14,12 @@ const firebaseConfig = {
 const ADMIN_EMAIL = "allaboutwaterdiamond@gmail.com";
 const DEFAULT_PFP = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
 
+// YOUR IMGBB API KEY IS NOW ACTIVE
+const IMGBB_API_KEY = "d5fd4e3e9fedc18b9bed075f980f12b7"; 
+
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const storage = getStorage(app);
 setPersistence(auth, browserLocalPersistence);
 
 let activeServerId = null;
@@ -109,6 +110,11 @@ document.getElementById('login-form').onsubmit = (e) => {
 
 document.getElementById('logout-btn').onclick = () => { signOut(auth); window.routeTo('home'); };
 
+// LIVE UPDATE PFP PREVIEW WHEN PASTING URL
+document.getElementById('display-pfp').addEventListener('input', (e) => {
+    document.getElementById('dashboard-pfp-preview').src = e.target.value || DEFAULT_PFP;
+});
+
 document.getElementById('profile-form').onsubmit = async (e) => {
     e.preventDefault();
     const newName = document.getElementById('display-name').value;
@@ -120,7 +126,7 @@ document.getElementById('profile-form').onsubmit = async (e) => {
     }
 };
 
-// --- DRAG AND DROP STORAGE ---
+// --- DRAG AND DROP: IMGBB API ---
 const pfpDropZone = document.getElementById('pfp-drop-zone');
 const pfpFileInput = document.getElementById('pfp-file-input');
 pfpDropZone.addEventListener('click', () => pfpFileInput.click());
@@ -139,26 +145,40 @@ serverDropZone.addEventListener('drop', (e) => { e.preventDefault(); serverDropZ
 
 async function handleImageUpload(file, type) {
     if (!file || !file.type.startsWith('image/')) return alert("Please upload a valid image file.");
-    let path, statusEl, previewEl;
+    
+    if (!IMGBB_API_KEY || IMGBB_API_KEY === "YOUR_IMGBB_KEY_GOES_HERE") {
+        return alert("Developer Error: ImgBB API key is missing.");
+    }
+
+    let statusEl, previewEl;
     
     if (type === 'pfp') {
-        path = `users/${auth.currentUser.uid}/pfp_${Date.now()}`;
         statusEl = document.getElementById('upload-status');
         previewEl = document.getElementById('dashboard-pfp-preview');
     } else if (type === 'server') {
         if(!activeServerId) return;
-        path = `servers/${activeServerId}/icon_${Date.now()}`;
         statusEl = document.getElementById('server-upload-status');
         previewEl = document.getElementById('server-icon-preview');
     }
 
     statusEl.style.display = 'block';
-    statusEl.innerText = "Uploading file to Firebase...";
+    statusEl.innerText = "Uploading to ImgBB...";
 
     try {
-        const storageRef = ref(storage, path);
-        await uploadBytesResumable(storageRef, file);
-        const downloadURL = await getDownloadURL(storageRef);
+        const formData = new FormData();
+        formData.append("image", file);
+        formData.append("key", IMGBB_API_KEY);
+
+        const response = await fetch("https://api.imgbb.com/1/upload", {
+            method: "POST",
+            body: formData
+        });
+
+        const data = await response.json();
+        
+        if (!data.success) throw new Error("API rejected the upload.");
+
+        const downloadURL = data.data.url;
 
         previewEl.src = downloadURL;
         previewEl.style.display = 'block';
@@ -172,8 +192,8 @@ async function handleImageUpload(file, type) {
         }
         setTimeout(() => statusEl.style.display = 'none', 4000);
     } catch (error) {
-        statusEl.innerText = "Error: Permission denied. Check Storage Rules.";
-        console.error(error);
+        statusEl.innerText = "Upload Failed. Check console.";
+        console.error("IMGBB Error:", error);
     }
 }
 
@@ -314,10 +334,32 @@ function selectServer(serverId, serverData, element) {
     });
 }
 
-document.getElementById('server-settings-btn').onclick = () => {
+document.getElementById('server-settings-btn').onclick = async () => {
     document.getElementById('server-settings-modal').style.display = 'flex';
     document.getElementById('server-upload-status').style.display = 'none';
+    
+    const serverSnap = await getDoc(doc(db, "discord_servers", activeServerId));
+    const url = serverSnap.data().photoURL || "";
+    
+    document.getElementById('server-icon-url').value = url;
+    document.getElementById('server-icon-preview').src = url;
+    document.getElementById('server-icon-preview').style.display = url ? 'block' : 'none';
 };
+
+document.getElementById('save-server-icon-btn').onclick = async () => {
+    const url = document.getElementById('server-icon-url').value;
+    try {
+        await updateDoc(doc(db, "discord_servers", activeServerId), { photoURL: url });
+        alert("Server Icon Updated!");
+        document.getElementById('server-settings-modal').style.display = 'none';
+    } catch(e) { alert("Error updating icon: " + e.message); }
+};
+
+document.getElementById('server-icon-url').addEventListener('input', (e) => {
+    const img = document.getElementById('server-icon-preview');
+    img.src = e.target.value;
+    img.style.display = e.target.value ? 'block' : 'none';
+});
 
 document.getElementById('add-channel-btn').onclick = async () => {
     if(!activeServerId) return;
