@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CrimsonFlame</title>
+    <title>CrimsonFlame | Support & News</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -32,33 +32,33 @@
     </header>
 
     <main id="page-home" class="page-content">
-        <section class="hero"><div class="container"><h2>Grid Updates</h2></div></section>
-        <section class="container"><div id="news-feed">Initialising news...</div></section>
+        <section class="hero"><div class="container"><h2>Latest Updates</h2></div></section>
+        <section class="container"><div id="news-feed">Loading news...</div></section>
     </main>
 
     <main id="page-login" class="page-content" style="display:none;">
         <section class="auth-container">
             <div class="auth-card">
                 <div id="login-container">
-                    <h2 id="auth-title">Agent Login</h2>
+                    <h2 id="auth-title">Login</h2>
                     <form id="login-form">
                         <input type="email" id="email" placeholder="Email" required>
                         <input type="password" id="password" placeholder="Password" required>
                         <button type="submit" class="btn-primary">Connect</button>
                     </form>
-                    <p class="toggle-text">No clearance? <span id="toggle-auth" class="text-link">Register</span></p>
+                    <p class="toggle-text">Need an account? <span id="toggle-auth" class="text-link">Register</span></p>
                 </div>
                 <div id="dashboard" style="display:none;">
-                    <h3>Welcome back, Agent.</h3>
+                    <h3>Welcome back.</h3>
                     <div id="admin-panel" style="display:none; border-top: 1px solid #333; margin-top:20px;">
-                        <p style="color:var(--crimson); margin:10px 0;">[ADMIN CONSOLE ACTIVE]</p>
+                        <p style="color:var(--crimson); margin:10px 0;">[ADMIN PANEL]</p>
                         <form id="news-form">
-                            <input type="text" id="news-title" placeholder="Update Title" required>
-                            <textarea id="news-body" placeholder="Markdown content..." rows="4" required></textarea>
-                            <button type="submit" class="btn-primary">Publish to Grid</button>
+                            <input type="text" id="news-title" placeholder="Title" required>
+                            <textarea id="news-body" placeholder="Content..." rows="4" required></textarea>
+                            <button type="submit" class="btn-primary">Publish News</button>
                         </form>
                     </div>
-                    <button id="logout-btn" class="btn-secondary">Disconnect</button>
+                    <button id="logout-btn" class="btn-secondary">Logout</button>
                 </div>
             </div>
         </section>
@@ -66,19 +66,19 @@
 
     <main id="page-tickets" class="page-content" style="display:none;">
         <section class="container" style="padding-top:40px;">
-            <h2 class="section-title">Support Protocol</h2>
+            <h2 class="section-title">Support</h2>
             <div id="ticket-system" style="display:none;">
                 <div id="list-view">
                     <div class="auth-card" style="max-width:100%; text-align:left; margin-bottom:20px;">
-                        <h3>Create New Ticket</h3>
+                        <h3>Create Ticket</h3>
                         <form id="ticket-form">
-                            <input type="text" id="ticket-subject" placeholder="Issue Subject" required>
-                            <textarea id="ticket-msg" placeholder="Describe the bug..." rows="3" required></textarea>
+                            <input type="text" id="ticket-subject" placeholder="Subject" required>
+                            <textarea id="ticket-msg" placeholder="Describe your issue..." rows="3" required></textarea>
                             <button type="submit" class="btn-primary">Open Ticket</button>
                         </form>
                     </div>
                     <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
-                        <h3>Active Threads</h3>
+                        <h3>Tickets</h3>
                         <button onclick="fetchTickets()" class="text-link" style="font-size:0.8rem;">Refresh</button>
                     </div>
                     <div id="ticket-list"></div>
@@ -90,7 +90,7 @@
                     <p id="active-status" style="font-size:0.8rem; margin-bottom:15px;"></p>
                     
                     <div id="resolution-box" style="display:none; background:rgba(220, 20, 60, 0.1); border:1px solid var(--crimson); padding:10px; border-radius:5px; margin-bottom:15px;">
-                        <strong style="color:var(--crimson);">Protocol Resolution:</strong>
+                        <strong style="color:var(--crimson);">Resolution:</strong>
                         <p id="resolution-text" style="font-size:0.9rem; margin-top:5px;"></p>
                     </div>
 
@@ -102,8 +102,8 @@
                     </form>
 
                     <div id="admin-close-area" style="display:none; margin-top:15px; border-top:1px solid #333; padding-top:15px;">
-                        <textarea id="close-reason" placeholder="Resolution reason..." rows="2"></textarea>
-                        <button id="close-ticket-btn" class="btn-secondary" style="width:100%; border-color:orange; color:orange;">Finalize & Close Ticket</button>
+                        <textarea id="close-reason" placeholder="Reason for closing..." rows="2"></textarea>
+                        <button id="close-ticket-btn" class="btn-secondary" style="width:100%; border-color:orange; color:orange;">Close Ticket</button>
                     </div>
                 </div>
             </div>
@@ -139,23 +139,20 @@
         let activeTicketId = null;
         let chatUnsubscribe = null;
 
-        // --- CHATTER POPUP ---
         window.openChatter = function() {
-            const w = 420;
+            const w = 900;
             const h = 600;
             const left = (screen.width/2)-(w/2);
             const top = (screen.height/2)-(h/2);
-            window.open('Chatter.html', 'Chatter', `width=${w},height=${h},top=${top},left=${left},resizable=no`);
+            window.open('Chatter.html', 'Chatter', `width=${w},height=${h},top=${top},left=${left}`);
         };
 
-        // --- EMAIL HELPERS ---
         function sendProtocolEmail(templateId, params) {
             emailjs.send("service_ka3dbxo", templateId, params)
-                .then(() => console.log("Protocol Dispatch Successful."))
-                .catch(err => console.error("Protocol Dispatch Failed:", err));
+                .then(() => console.log("Email Sent."))
+                .catch(err => console.error("Email Failed:", err));
         }
 
-        // --- ROUTING ---
         window.routeTo = function(page) {
             const url = new URL(window.location);
             url.searchParams.set('page', page);
@@ -177,7 +174,6 @@
         }
         window.addEventListener('popstate', navigate);
 
-        // --- NEWS ---
         async function fetchNews() {
             const q = query(collection(db, "news"), orderBy("timestamp", "desc"));
             const snap = await getDocs(q);
@@ -201,11 +197,10 @@
             fetchNews();
         };
 
-        // --- TICKETS ---
         window.fetchTickets = async function() {
             if(!auth.currentUser) return;
             const list = document.getElementById('ticket-list');
-            list.innerHTML = "Syncing Grid...";
+            list.innerHTML = "Loading...";
             let q = query(collection(db, "tickets"), orderBy("timestamp", "desc"));
             if(auth.currentUser.email !== ADMIN_EMAIL) {
                 q = query(collection(db, "tickets"), where("userId", "==", auth.currentUser.uid), orderBy("timestamp", "desc"));
@@ -309,7 +304,6 @@
             fetchTickets();
         };
 
-        // --- AUTH ---
         onAuthStateChanged(auth, user => {
             const nav = document.getElementById('nav-auth-link');
             if(user) {
@@ -332,7 +326,7 @@
         let isLogin = true;
         document.getElementById('toggle-auth').onclick = () => {
             isLogin = !isLogin;
-            document.getElementById('auth-title').innerText = isLogin ? "Agent Login" : "Register";
+            document.getElementById('auth-title').innerText = isLogin ? "Login" : "Register";
             document.getElementById('toggle-auth').innerText = isLogin ? "Register" : "Login";
         };
 
