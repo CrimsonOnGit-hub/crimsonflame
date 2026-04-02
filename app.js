@@ -1,7 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence, updateProfile } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 import { getFirestore, collection, addDoc, getDocs, query, orderBy, where, doc, onSnapshot, updateDoc, serverTimestamp, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-// NEW IMPORTS FOR STORAGE
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-storage.js";
 
 const firebaseConfig = {
@@ -19,16 +18,31 @@ const DEFAULT_PFP = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const storage = getStorage(app); // INITIALIZE STORAGE
+const storage = getStorage(app);
 setPersistence(auth, browserLocalPersistence);
 
 let activeServerId = null;
 let activeServerAdmins = []; 
 let activeChannelId = null;
+let isGlobalAdmin = false; 
 
 let chatterServersUnsub = null;
 let chatterChannelsUnsub = null;
 let chatterMessagesUnsub = null;
+let ticketChatUnsubscribe = null;
+let activeTicketId = null;
+
+// --- NOTIFICATIONS ---
+function requestNotificationPermission() {
+    if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
+        Notification.requestPermission();
+    }
+}
+function triggerBrowserNotification(title, body) {
+    if ("Notification" in window && Notification.permission === "granted") {
+        new Notification(title, { body: body, icon: DEFAULT_PFP });
+    }
+}
 
 // --- ROUTING ---
 window.routeTo = function(page) {
@@ -40,16 +54,23 @@ window.routeTo = function(page) {
     const activeLink = document.querySelector(`nav a[onclick="routeTo('${page}')"]`);
     if(activeLink) activeLink.style.color = 'var(--crimson)';
 
+    if(page === 'updates') fetchNews();
     if(page === 'chatter' && auth.currentUser) initChatter();
+    if(page === 'tickets' && auth.currentUser) window.fetchTickets();
 };
 
 // --- AUTH ---
 onAuthStateChanged(auth, user => {
     const navAuth = document.getElementById('nav-auth-link');
     if(user) {
+        requestNotificationPermission();
+        isGlobalAdmin = (user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase());
+
         navAuth.innerText = "Dashboard";
         document.getElementById('login-container').style.display = 'none';
         document.getElementById('dashboard-container').style.display = 'block';
+        document.getElementById('ticket-locked').style.display = 'none';
+        document.getElementById('ticket-system').style.display = 'block';
         document.getElementById('chatter-locked').style.display = 'none';
         document.getElementById('chatter-system').style.display = 'flex';
         
@@ -57,10 +78,15 @@ onAuthStateChanged(auth, user => {
         document.getElementById('display-name').value = user.displayName || "";
         document.getElementById('display-pfp').value = user.photoURL || "";
         document.getElementById('dashboard-pfp-preview').src = user.photoURL || DEFAULT_PFP;
+
+        document.getElementById('admin-panel').style.display = isGlobalAdmin ? 'block' : 'none';
     } else {
+        isGlobalAdmin = false;
         navAuth.innerText = "Login";
         document.getElementById('login-container').style.display = 'block';
         document.getElementById('dashboard-container').style.display = 'none';
+        document.getElementById('ticket-locked').style.display = 'block';
+        document.getElementById('ticket-system').style.display = 'none';
         document.getElementById('chatter-locked').style.display = 'flex';
         document.getElementById('chatter-system').style.display = 'none';
     }
@@ -77,63 +103,44 @@ document.getElementById('login-form').onsubmit = (e) => {
     e.preventDefault();
     const email = document.getElementById('email').value;
     const pass = document.getElementById('password').value;
-    if(isLogin) signInWithEmailAndPassword(auth, email, pass).then(()=>routeTo('home')).catch(err=>alert(err.message));
-    else createUserWithEmailAndPassword(auth, email, pass).then(()=>routeTo('home')).catch(err=>alert(err.message));
+    if(isLogin) signInWithEmailAndPassword(auth, email, pass).then(()=>window.routeTo('home')).catch(err=>alert(err.message));
+    else createUserWithEmailAndPassword(auth, email, pass).then(()=>window.routeTo('home')).catch(err=>alert(err.message));
 };
 
-document.getElementById('logout-btn').onclick = () => { signOut(auth); routeTo('home'); };
+document.getElementById('logout-btn').onclick = () => { signOut(auth); window.routeTo('home'); };
 
 document.getElementById('profile-form').onsubmit = async (e) => {
     e.preventDefault();
     const newName = document.getElementById('display-name').value;
-    const newPfp = document.getElementById('display-pfp').value; // URL from drag-drop
+    const newPfp = document.getElementById('display-pfp').value;
     if (auth.currentUser) {
         await updateProfile(auth.currentUser, { displayName: newName, photoURL: newPfp });
-        alert("Profile Updated!");
+        document.getElementById('dashboard-pfp-preview').src = newPfp || DEFAULT_PFP;
+        alert("Profile Updated Successfully!");
     }
 };
 
-// --- DRAG AND DROP LOGIC: PROFILE PICTURE ---
+// --- DRAG AND DROP STORAGE ---
 const pfpDropZone = document.getElementById('pfp-drop-zone');
 const pfpFileInput = document.getElementById('pfp-file-input');
-
 pfpDropZone.addEventListener('click', () => pfpFileInput.click());
 pfpFileInput.addEventListener('change', (e) => handleImageUpload(e.target.files[0], 'pfp'));
-
-pfpDropZone.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    pfpDropZone.classList.add('dragover');
-});
+pfpDropZone.addEventListener('dragover', (e) => { e.preventDefault(); pfpDropZone.classList.add('dragover'); });
 pfpDropZone.addEventListener('dragleave', () => pfpDropZone.classList.remove('dragover'));
-pfpDropZone.addEventListener('drop', (e) => {
-    e.preventDefault();
-    pfpDropZone.classList.remove('dragover');
-    if (e.dataTransfer.files.length) handleImageUpload(e.dataTransfer.files[0], 'pfp');
-});
+pfpDropZone.addEventListener('drop', (e) => { e.preventDefault(); pfpDropZone.classList.remove('dragover'); if (e.dataTransfer.files.length) handleImageUpload(e.dataTransfer.files[0], 'pfp'); });
 
-// --- DRAG AND DROP LOGIC: SERVER ICON ---
 const serverDropZone = document.getElementById('server-drop-zone');
 const serverFileInput = document.getElementById('server-file-input');
-
 serverDropZone.addEventListener('click', () => serverFileInput.click());
 serverFileInput.addEventListener('change', (e) => handleImageUpload(e.target.files[0], 'server'));
-
-serverDropZone.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    serverDropZone.classList.add('dragover');
-});
+serverDropZone.addEventListener('dragover', (e) => { e.preventDefault(); serverDropZone.classList.add('dragover'); });
 serverDropZone.addEventListener('dragleave', () => serverDropZone.classList.remove('dragover'));
-serverDropZone.addEventListener('drop', (e) => {
-    e.preventDefault();
-    serverDropZone.classList.remove('dragover');
-    if (e.dataTransfer.files.length) handleImageUpload(e.dataTransfer.files[0], 'server');
-});
+serverDropZone.addEventListener('drop', (e) => { e.preventDefault(); serverDropZone.classList.remove('dragover'); if (e.dataTransfer.files.length) handleImageUpload(e.dataTransfer.files[0], 'server'); });
 
-// --- CORE UPLOAD FUNCTION ---
 async function handleImageUpload(file, type) {
     if (!file || !file.type.startsWith('image/')) return alert("Please upload a valid image file.");
-    
     let path, statusEl, previewEl;
+    
     if (type === 'pfp') {
         path = `users/${auth.currentUser.uid}/pfp_${Date.now()}`;
         statusEl = document.getElementById('upload-status');
@@ -146,7 +153,7 @@ async function handleImageUpload(file, type) {
     }
 
     statusEl.style.display = 'block';
-    statusEl.innerText = "Uploading...";
+    statusEl.innerText = "Uploading file to Firebase...";
 
     try {
         const storageRef = ref(storage, path);
@@ -158,18 +165,45 @@ async function handleImageUpload(file, type) {
 
         if (type === 'pfp') {
             document.getElementById('display-pfp').value = downloadURL;
-            statusEl.innerText = "Upload complete! Click Save Profile.";
+            statusEl.innerText = "Done! Click 'Save Profile Info'.";
         } else if (type === 'server') {
             await updateDoc(doc(db, "discord_servers", activeServerId), { photoURL: downloadURL });
             statusEl.innerText = "Server Icon Updated!";
         }
-        
-        setTimeout(() => statusEl.style.display = 'none', 3000);
+        setTimeout(() => statusEl.style.display = 'none', 4000);
     } catch (error) {
-        statusEl.innerText = "Error: " + error.message;
+        statusEl.innerText = "Error: Permission denied. Check Storage Rules.";
         console.error(error);
     }
 }
+
+// --- UPDATES ---
+async function fetchNews() {
+    const feed = document.getElementById('news-feed');
+    try {
+        const snap = await getDocs(query(collection(db, "news"), orderBy("timestamp", "desc")));
+        feed.innerHTML = "";
+        if(snap.empty) { feed.innerHTML = "<p style='color:#aaa;'>No updates posted yet.</p>"; return; }
+        snap.forEach(d => {
+            const data = d.data();
+            feed.innerHTML += `<div class="news-card"><small style="color:var(--crimson);">${data.date}</small><h3 style="margin:5px 0;">${data.title}</h3><div>${marked.parse(data.body)}</div></div>`;
+        });
+    } catch(e) {
+        feed.innerHTML = `<p style="color:var(--crimson);">Error fetching updates: ${e.message}</p>`;
+    }
+}
+
+document.getElementById('news-form').onsubmit = async (e) => {
+    e.preventDefault();
+    await addDoc(collection(db, "news"), {
+        title: document.getElementById('news-title').value,
+        body: document.getElementById('news-body').value,
+        date: new Date().toLocaleDateString(),
+        timestamp: serverTimestamp()
+    });
+    document.getElementById('news-form').reset();
+    alert("Published!");
+};
 
 // --- CHATTER ---
 function initChatter() {
@@ -206,7 +240,7 @@ document.getElementById('add-server-btn').onclick = async () => {
                 name: name, owner: auth.currentUser.uid, members: [auth.currentUser.uid], admins: [auth.currentUser.uid], banned: [], photoURL: "", timestamp: serverTimestamp() 
             });
             await addDoc(collection(db, "discord_servers", newServer.id, "channels"), { name: "general", timestamp: serverTimestamp() });
-        } catch(err) { alert("Failed to create server. " + err.message); }
+        } catch(err) { alert("Failed to create server: " + err.message); }
     }
 };
 
@@ -226,10 +260,12 @@ document.getElementById('btn-discovery').onclick = async () => {
 
     const snap = await getDocs(collection(db, "discord_servers"));
     discBox.innerHTML = "";
+    if(snap.empty) { discBox.innerHTML = "<p style='color:#aaa; width:100%; text-align:center;'>No servers exist.</p>"; return; }
+
     snap.forEach(docSnap => {
         const data = docSnap.data();
         if(!data.members?.includes(auth.currentUser.uid) && !data.banned?.includes(auth.currentUser.uid)) {
-            const imgHtml = data.photoURL ? `<img src="${data.photoURL}">` : `<div style="width:80px;height:80px;border-radius:50%;background:#222;margin:0 auto 10px;line-height:80px;font-size:1.5rem;font-weight:bold;">${data.name.substring(0,2).toUpperCase()}</div>`;
+            const imgHtml = data.photoURL ? `<img src="${data.photoURL}">` : `<div class="discovery-card-placeholder">${data.name.substring(0,2).toUpperCase()}</div>`;
             discBox.innerHTML += `<div class="discovery-card">${imgHtml}<h3>${data.name}</h3><button class="btn-primary" onclick="joinServer('${docSnap.id}')">Join</button></div>`;
         }
     });
@@ -249,9 +285,10 @@ function selectServer(serverId, serverData, element) {
     activeServerId = serverId;
     activeServerAdmins = serverData.admins || [serverData.owner];
     activeChannelId = null;
-    
     document.getElementById('active-server-name').innerText = serverData.name;
-    const amIAdmin = activeServerAdmins.includes(auth.currentUser.uid);
+    
+    const amIAdmin = activeServerAdmins.includes(auth.currentUser.uid) || serverData.owner === auth.currentUser.uid || isGlobalAdmin;
+    
     document.getElementById('add-channel-btn').style.display = amIAdmin ? 'block' : 'none';
     document.getElementById('server-settings-btn').style.display = amIAdmin ? 'block' : 'none';
     
@@ -277,7 +314,6 @@ function selectServer(serverId, serverData, element) {
     });
 }
 
-// OPEN SERVER SETTINGS MODAL
 document.getElementById('server-settings-btn').onclick = () => {
     document.getElementById('server-settings-modal').style.display = 'flex';
     document.getElementById('server-upload-status').style.display = 'none';
@@ -286,9 +322,7 @@ document.getElementById('server-settings-btn').onclick = () => {
 document.getElementById('add-channel-btn').onclick = async () => {
     if(!activeServerId) return;
     const name = prompt("Enter Channel Name:");
-    if(name) {
-        await addDoc(collection(db, "discord_servers", activeServerId, "channels"), { name: name.toLowerCase().replace(/\s+/g, '-'), timestamp: serverTimestamp() });
-    }
+    if(name) await addDoc(collection(db, "discord_servers", activeServerId, "channels"), { name: name.toLowerCase().replace(/\s+/g, '-'), timestamp: serverTimestamp() });
 };
 
 function selectChannel(channelId, channelName, element) {
@@ -299,10 +333,12 @@ function selectChannel(channelId, channelName, element) {
     document.querySelectorAll('.channel-item').forEach(el => el.classList.remove('active'));
     element.classList.add('active');
 
-    const amIAdmin = activeServerAdmins.includes(auth.currentUser.uid);
+    const amIAdmin = activeServerAdmins.includes(auth.currentUser.uid) || isGlobalAdmin;
+    const myName = auth.currentUser.displayName || auth.currentUser.email.split('@')[0];
 
     if(chatterMessagesUnsub) chatterMessagesUnsub();
     const box = document.getElementById('chat-box');
+    let isInitialLoad = true;
 
     chatterMessagesUnsub = onSnapshot(query(collection(db, "discord_servers", activeServerId, "channels", activeChannelId, "messages"), orderBy("timestamp", "asc")), snap => {
         box.innerHTML = "";
@@ -312,7 +348,10 @@ function selectChannel(channelId, channelName, element) {
             const nameToUse = m.senderName || m.senderEmail.split('@')[0];
             const pfpToUse = m.senderPfp || DEFAULT_PFP;
             
+            const isEveryone = m.text.includes('@everyone');
+            const isPinged = m.text.includes(`@${myName}`) || isEveryone;
             let formattedText = m.text.replace(/@(\w+)/g, '<span class="mention">@$1</span>');
+            const pingClass = isPinged ? 'ping-highlight' : '';
             
             let actionHTML = '';
             if(amIAdmin && m.senderUid !== auth.currentUser.uid) {
@@ -325,11 +364,25 @@ function selectChannel(channelId, channelName, element) {
                     <img src="${pfpToUse}" class="chat-pfp">
                     <div class="msg-content">
                         <span class="msg-sender">${nameToUse} <div style="display:flex; gap:5px;">${actionHTML}</div></span>
-                        <div class="msg-text">${formattedText}</div>
+                        <div class="msg-text ${pingClass}">${formattedText}</div>
                     </div>
                 </div>`;
         });
         box.scrollTop = box.scrollHeight;
+
+        if (!isInitialLoad) {
+            snap.docChanges().forEach(change => {
+                if (change.type === 'added') {
+                    const m = change.doc.data();
+                    if (m.senderUid !== auth.currentUser.uid) {
+                        const senderDisplay = m.senderName || m.senderEmail.split('@')[0];
+                        if (m.text.includes(`@${myName}`) || m.text.includes('@everyone')) triggerBrowserNotification(`Ping in #${channelName}`, `${senderDisplay}: ${m.text}`);
+                        else if (document.hidden) triggerBrowserNotification(`New message in #${channelName}`, `${senderDisplay}: ${m.text}`);
+                    }
+                }
+            });
+        }
+        isInitialLoad = false;
     });
 }
 
@@ -356,4 +409,108 @@ document.getElementById('chat-form').onsubmit = async (e) => {
         senderName: auth.currentUser.displayName || "", senderPfp: auth.currentUser.photoURL || "", timestamp: serverTimestamp()
     });
     input.value = "";
+};
+
+// --- SUPPORT TICKETS ---
+window.fetchTickets = async function() {
+    if(!auth.currentUser) return;
+    const list = document.getElementById('ticket-list');
+    list.innerHTML = "Syncing Grid...";
+    
+    let q = query(collection(db, "tickets"), orderBy("timestamp", "desc"));
+    if(!isGlobalAdmin) q = query(collection(db, "tickets"), where("userId", "==", auth.currentUser.uid), orderBy("timestamp", "desc"));
+    
+    try {
+        const snap = await getDocs(q);
+        list.innerHTML = "";
+        if(snap.empty) { list.innerHTML = "<p style='color:#aaa;'>No support tickets found.</p>"; return; }
+        
+        snap.forEach(tDoc => {
+            const d = tDoc.data();
+            const item = document.createElement('div');
+            item.className = "auth-card";
+            item.style.cursor = "pointer";
+            item.innerHTML = `<strong>${d.subject}</strong> <span style="float:right; color:${d.status === 'Open' ? '#0f0' : '#777'}">${d.status}</span><br><small>${d.userEmail}</small>`;
+            item.onclick = () => openThread(tDoc.id, d);
+            list.appendChild(item);
+        });
+    } catch(err) { 
+        list.innerHTML = `<p style="color:var(--crimson);">Error fetching tickets: ${err.message}. Check Firebase Index rules.</p>`;
+        console.error(err); 
+    }
+}
+
+function openThread(id, data) {
+    activeTicketId = id;
+    document.getElementById('list-view').style.display = 'none';
+    document.getElementById('thread-view').style.display = 'block';
+    document.getElementById('active-subject').innerText = data.subject;
+    
+    if (data.status === "Closed") {
+        document.getElementById('ticket-chat-form').style.display = 'none';
+        document.getElementById('admin-close-area').style.display = 'none';
+        document.getElementById('resolution-box').style.display = 'block';
+        document.getElementById('resolution-text').innerText = data.closeReason || "No reason recorded.";
+    } else {
+        document.getElementById('ticket-chat-form').style.display = 'flex';
+        document.getElementById('resolution-box').style.display = 'none';
+        document.getElementById('admin-close-area').style.display = isGlobalAdmin ? 'block' : 'none';
+    }
+
+    document.getElementById('close-ticket-btn').onclick = async () => {
+        const r = document.getElementById('close-reason').value;
+        if(!r) return alert("Resolution required.");
+        await updateDoc(doc(db, "tickets", id), { status: "Closed", closeReason: r });
+        document.getElementById('back-btn').click();
+    };
+
+    let isInitialLoad = true;
+    if(ticketChatUnsubscribe) ticketChatUnsubscribe();
+    
+    ticketChatUnsubscribe = onSnapshot(query(collection(db, "tickets", id, "messages"), orderBy("timestamp", "asc")), snap => {
+        const box = document.getElementById('ticket-chat-box');
+        box.innerHTML = "";
+        snap.forEach(mDoc => {
+            const m = mDoc.data();
+            const isMe = m.sender === auth.currentUser.email;
+            box.innerHTML += `<div style="align-self:${isMe ? 'flex-end' : 'flex-start'}; background:${isMe ? 'var(--crimson)' : '#222'}; padding:8px 12px; border-radius:8px; max-width:80%; font-size:0.9rem;">
+                <small style="display:block; opacity:0.5; font-size:0.6rem;">${m.senderName || m.sender}</small>${m.text}</div>`;
+        });
+        box.scrollTop = box.scrollHeight;
+
+        if (!isInitialLoad && document.hidden) {
+            snap.docChanges().forEach(change => {
+                if (change.type === 'added') {
+                    const m = change.doc.data();
+                    if (m.sender !== auth.currentUser.email) {
+                        triggerBrowserNotification("Support Ticket Update", `${m.senderName || m.sender}: ${m.text}`);
+                    }
+                }
+            });
+        }
+        isInitialLoad = false;
+    });
+}
+
+document.getElementById('back-btn').onclick = () => {
+    document.getElementById('list-view').style.display = 'block';
+    document.getElementById('thread-view').style.display = 'none';
+    if(ticketChatUnsubscribe) ticketChatUnsubscribe();
+    window.fetchTickets();
+};
+
+document.getElementById('ticket-chat-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const input = document.getElementById('ticket-chat-input');
+    await addDoc(collection(db, "tickets", activeTicketId, "messages"), { text: input.value, sender: auth.currentUser.email, senderName: auth.currentUser.displayName || auth.currentUser.email, timestamp: serverTimestamp() });
+    input.value = "";
+};
+
+document.getElementById('ticket-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const subj = document.getElementById('ticket-subject').value;
+    const msg = document.getElementById('ticket-msg').value;
+    await addDoc(collection(db, "tickets"), { userId: auth.currentUser.uid, userEmail: auth.currentUser.email, subject: subj, message: msg, status: "Open", timestamp: serverTimestamp() });
+    document.getElementById('ticket-form').reset();
+    window.fetchTickets();
 };
