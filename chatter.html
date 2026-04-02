@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>CRIMSON | CHATTER</title>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@700&display=swap" rel="stylesheet">
+    <style>
+        :root { --crimson: #dc143c; --bg: #0a0a0a; --text: #e0e0e0; }
+        body { 
+            margin: 0; background: var(--bg); color: var(--text); 
+            font-family: 'Rajdhani', sans-serif; height: 100vh; display: flex; flex-direction: column; 
+            border: 1px solid #222; box-sizing: border-box;
+        }
+        header { 
+            padding: 12px; background: #111; border-bottom: 2px solid var(--crimson); 
+            text-align: center; font-size: 1.1rem; letter-spacing: 3px;
+        }
+        header span { color: var(--crimson); }
+        #chat-window { flex-grow: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        .msg { max-width: 80%; padding: 8px 12px; border-radius: 4px; font-size: 0.9rem; border: 1px solid #333; }
+        .sent { align-self: flex-end; background: var(--crimson); color: white; border: none; }
+        .received { align-self: flex-start; background: #1a1a1a; border-left: 3px solid var(--crimson); }
+        .input-box { padding: 15px; background: #111; display: flex; gap: 5px; }
+        input { flex-grow: 1; background: #000; border: 1px solid #333; color: white; padding: 10px; font-family: inherit; }
+        button { background: var(--crimson); border: none; color: white; padding: 0 15px; cursor: pointer; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <header>CRIMSON<span>CHATTER</span></header>
+    <div id="chat-window">
+        <div class="msg received">System: Connection secure. Global Grid active.</div>
+    </div>
+    <form class="input-box" id="f">
+        <input type="text" id="i" placeholder="Transmit..." autocomplete="off">
+        <button type="submit">SEND</button>
+    </form>
+
+    <script>
+        const win = document.getElementById('chat-window');
+        document.getElementById('f').onsubmit = (e) => {
+            e.preventDefault();
+            const val = document.getElementById('i').value;
+            if(!val.trim()) return;
+            
+            const d = document.createElement('div');
+            d.className = 'msg sent';
+            d.innerText = val;
+            win.appendChild(d);
+            
+            document.getElementById('i').value = '';
+            win.scrollTop = win.scrollHeight;
+
+            setTimeout(() => {
+                const r = document.createElement('div');
+                r.className = 'msg received';
+                r.innerText = "Acknowledged. Communication logged.";
+                win.appendChild(r);
+                win.scrollTop = win.scrollHeight;
+            }, 1000);
+        };
+    </script>
+</body>
+</html>
