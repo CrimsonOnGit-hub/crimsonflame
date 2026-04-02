@@ -2,343 +2,100 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CrimsonFlame | Support & News</title>
-    <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    
-    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
-    <script type="text/javascript">
-        (function() {
-            emailjs.init("invG_cVokMtCIdBX8");
-        })();
-    </script>
+    <title>Chatter</title>
+    <style>
+        :root {
+            --bg-darker: #1e1f22;
+            --bg-dark: #2b2d31;
+            --bg-light: #313338;
+            --text: #dbdee1;
+            --crimson: #dc143c;
+        }
+        body { margin: 0; display: flex; height: 100vh; font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg-dark); color: var(--text); overflow: hidden; }
+        
+        /* Sidebar (Channels) */
+        .sidebar { width: 240px; background: var(--bg-darker); display: flex; flex-direction: column; }
+        .sidebar-header { padding: 15px; border-bottom: 1px solid #111; font-weight: bold; font-size: 1.1rem; }
+        .channel-list { padding: 10px; flex-grow: 1; }
+        .channel-item { padding: 8px 12px; border-radius: 4px; cursor: pointer; margin-bottom: 2px; color: #949ba4; }
+        .channel-item:hover { background: #35373c; color: white; }
+        .channel-item.active { background: #3f4147; color: white; }
+        .channel-item::before { content: "# "; font-size: 1.2rem; }
+
+        /* Main Chat Area */
+        .chat-area { flex-grow: 1; display: flex; flex-direction: column; background: var(--bg-light); }
+        .chat-header { padding: 15px; background: var(--bg-light); border-bottom: 1px solid #26272b; font-weight: bold; }
+        #message-window { flex-grow: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
+        
+        .message { display: flex; flex-direction: column; }
+        .msg-user { font-weight: bold; font-size: 0.95rem; color: white; margin-bottom: 4px; }
+        .msg-text { font-size: 0.95rem; line-height: 1.4; color: var(--text); }
+        
+        .input-wrapper { padding: 0 20px 20px; }
+        .input-box { background: #383a40; border-radius: 8px; padding: 10px 15px; display: flex; }
+        input { flex-grow: 1; background: transparent; border: none; color: white; outline: none; font-size: 1rem; }
+
+        /* User List */
+        .user-sidebar { width: 200px; background: var(--bg-darker); padding: 15px; }
+        .user-sidebar h4 { font-size: 0.75rem; text-transform: uppercase; color: #949ba4; margin-bottom: 15px; }
+        .user-item { display: flex; align-items: center; gap: 10px; font-size: 0.9rem; margin-bottom: 12px; }
+        .status-dot { width: 10px; height: 10px; background: #23a55a; border-radius: 50%; }
+    </style>
 </head>
 <body>
-
-    <header>
-        <div class="container header-container">
-            <h1 class="logo" style="cursor:pointer;" onclick="routeTo('home')">CRIMSON<span>FLAME</span></h1>
-            <nav>
-                <ul>
-                    <li><a href="javascript:void(0)" onclick="routeTo('home')">News</a></li>
-                    <li><a href="javascript:void(0)" onclick="openChatter()">Chatter</a></li>
-                    <li><a href="javascript:void(0)" onclick="routeTo('tickets')">Support</a></li>
-                    <li><a href="javascript:void(0)" id="nav-auth-link" onclick="routeTo('login')">Login</a></li>
-                </ul>
-            </nav>
+    <div class="sidebar">
+        <div class="sidebar-header">CrimsonFlame</div>
+        <div class="channel-list">
+            <div class="channel-item active">general</div>
+            <div class="channel-item">support</div>
+            <div class="channel-item">dev-log</div>
         </div>
-    </header>
+    </div>
 
-    <main id="page-home" class="page-content">
-        <section class="hero"><div class="container"><h2>Latest Updates</h2></div></section>
-        <section class="container"><div id="news-feed">Loading news...</div></section>
-    </main>
-
-    <main id="page-login" class="page-content" style="display:none;">
-        <section class="auth-container">
-            <div class="auth-card">
-                <div id="login-container">
-                    <h2 id="auth-title">Login</h2>
-                    <form id="login-form">
-                        <input type="email" id="email" placeholder="Email" required>
-                        <input type="password" id="password" placeholder="Password" required>
-                        <button type="submit" class="btn-primary">Connect</button>
-                    </form>
-                    <p class="toggle-text">Need an account? <span id="toggle-auth" class="text-link">Register</span></p>
-                </div>
-                <div id="dashboard" style="display:none;">
-                    <h3>Welcome back.</h3>
-                    <div id="admin-panel" style="display:none; border-top: 1px solid #333; margin-top:20px;">
-                        <p style="color:var(--crimson); margin:10px 0;">[ADMIN PANEL]</p>
-                        <form id="news-form">
-                            <input type="text" id="news-title" placeholder="Title" required>
-                            <textarea id="news-body" placeholder="Content..." rows="4" required></textarea>
-                            <button type="submit" class="btn-primary">Publish News</button>
-                        </form>
-                    </div>
-                    <button id="logout-btn" class="btn-secondary">Logout</button>
-                </div>
+    <div class="chat-area">
+        <div class="chat-header"># general</div>
+        <div id="message-window">
+            <div class="message">
+                <span class="msg-user">System</span>
+                <span class="msg-text">Welcome to the chat.</span>
             </div>
-        </section>
-    </main>
-
-    <main id="page-tickets" class="page-content" style="display:none;">
-        <section class="container" style="padding-top:40px;">
-            <h2 class="section-title">Support</h2>
-            <div id="ticket-system" style="display:none;">
-                <div id="list-view">
-                    <div class="auth-card" style="max-width:100%; text-align:left; margin-bottom:20px;">
-                        <h3>Create Ticket</h3>
-                        <form id="ticket-form">
-                            <input type="text" id="ticket-subject" placeholder="Subject" required>
-                            <textarea id="ticket-msg" placeholder="Describe your issue..." rows="3" required></textarea>
-                            <button type="submit" class="btn-primary">Open Ticket</button>
-                        </form>
-                    </div>
-                    <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
-                        <h3>Tickets</h3>
-                        <button onclick="fetchTickets()" class="text-link" style="font-size:0.8rem;">Refresh</button>
-                    </div>
-                    <div id="ticket-list"></div>
-                </div>
-
-                <div id="thread-view" class="auth-card" style="display:none; max-width:100%; text-align:left;">
-                    <button id="back-btn" class="text-link"><- Back</button>
-                    <h2 id="active-subject" style="margin:15px 0 5px;"></h2>
-                    <p id="active-status" style="font-size:0.8rem; margin-bottom:15px;"></p>
-                    
-                    <div id="resolution-box" style="display:none; background:rgba(220, 20, 60, 0.1); border:1px solid var(--crimson); padding:10px; border-radius:5px; margin-bottom:15px;">
-                        <strong style="color:var(--crimson);">Resolution:</strong>
-                        <p id="resolution-text" style="font-size:0.9rem; margin-top:5px;"></p>
-                    </div>
-
-                    <div id="chat-box" style="height:300px; overflow-y:auto; display:flex; flex-direction:column; gap:10px; padding:10px; background:#000; border-radius:5px; margin-bottom:15px;"></div>
-                    
-                    <form id="chat-form" style="display:flex; gap:10px;">
-                        <input type="text" id="chat-input" placeholder="Message..." required>
-                        <button type="submit" class="btn-primary">Send</button>
-                    </form>
-
-                    <div id="admin-close-area" style="display:none; margin-top:15px; border-top:1px solid #333; padding-top:15px;">
-                        <textarea id="close-reason" placeholder="Reason for closing..." rows="2"></textarea>
-                        <button id="close-ticket-btn" class="btn-secondary" style="width:100%; border-color:orange; color:orange;">Close Ticket</button>
-                    </div>
-                </div>
+        </div>
+        <form class="input-wrapper" id="chat-form">
+            <div class="input-box">
+                <input type="text" id="user-input" placeholder="Message #general" autocomplete="off">
             </div>
+        </form>
+    </div>
+
+    <div class="user-sidebar">
+        <h4>Online — 1</h4>
+        <div class="user-item">
+            <div class="status-dot"></div>
+            <span>Current User</span>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('chat-form');
+        const win = document.getElementById('message-window');
+        const input = document.getElementById('user-input');
+
+        form.onsubmit = (e) => {
+            e.preventDefault();
+            const text = input.value.trim();
+            if (!text) return;
+
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'message';
+            msgDiv.innerHTML = `
+                <span class="msg-user">You</span>
+                <span class="msg-text">${text}</span>
+            `;
+            win.appendChild(msgDiv);
             
-            <div id="ticket-locked" style="text-align:center; padding:40px;">
-                <p>Login required for support.</p>
-                <button onclick="routeTo('login')" class="btn-primary" style="margin-top:15px; width:auto;">Login</button>
-            </div>
-        </section>
-    </main>
-
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, getDocs, query, orderBy, where, doc, onSnapshot, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyBSSJKDrFJ1_qlliZqgw34CY2TSaKOxxxM",
-            authDomain: "crimsonflame-8169e.firebaseapp.com",
-            projectId: "crimsonflame-8169e",
-            storageBucket: "crimsonflame-8169e.firebasestorage.app",
-            messagingSenderId: "406321213530",
-            appId: "1:406321213530:web:92d27a69d34d147393a863"
+            input.value = '';
+            win.scrollTop = win.scrollHeight;
         };
-
-        const ADMIN_EMAIL = "allaboutwaterdiamond@gmail.com";
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-
-        setPersistence(auth, browserLocalPersistence);
-
-        let activeTicketId = null;
-        let chatUnsubscribe = null;
-
-        window.openChatter = function() {
-            const w = 900;
-            const h = 600;
-            const left = (screen.width/2)-(w/2);
-            const top = (screen.height/2)-(h/2);
-            window.open('Chatter.html', 'Chatter', `width=${w},height=${h},top=${top},left=${left}`);
-        };
-
-        function sendProtocolEmail(templateId, params) {
-            emailjs.send("service_ka3dbxo", templateId, params)
-                .then(() => console.log("Email Sent."))
-                .catch(err => console.error("Email Failed:", err));
-        }
-
-        window.routeTo = function(page) {
-            const url = new URL(window.location);
-            url.searchParams.set('page', page);
-            window.history.pushState({}, '', url);
-            navigate();
-        };
-
-        function navigate() {
-            const page = new URLSearchParams(window.location.search).get('page') || 'home';
-            document.querySelectorAll('.page-content').forEach(p => p.style.display = 'none');
-            const target = document.getElementById('page-' + page);
-            if(target) target.style.display = 'block';
-            if(page === 'home') fetchNews();
-            if(page === 'tickets') {
-                document.getElementById('list-view').style.display = 'block';
-                document.getElementById('thread-view').style.display = 'none';
-                if(auth.currentUser) fetchTickets();
-            }
-        }
-        window.addEventListener('popstate', navigate);
-
-        async function fetchNews() {
-            const q = query(collection(db, "news"), orderBy("timestamp", "desc"));
-            const snap = await getDocs(q);
-            const feed = document.getElementById('news-feed');
-            feed.innerHTML = "";
-            snap.forEach(d => {
-                const data = d.data();
-                feed.innerHTML += `<article class="news-card"><span class="news-date">${data.date}</span><h3>${data.title}</h3><div>${marked.parse(data.body)}</div></article>`;
-            });
-        }
-
-        document.getElementById('news-form').onsubmit = async (e) => {
-            e.preventDefault();
-            await addDoc(collection(db, "news"), {
-                title: document.getElementById('news-title').value,
-                body: document.getElementById('news-body').value,
-                date: new Date().toLocaleDateString(),
-                timestamp: serverTimestamp()
-            });
-            document.getElementById('news-form').reset();
-            fetchNews();
-        };
-
-        window.fetchTickets = async function() {
-            if(!auth.currentUser) return;
-            const list = document.getElementById('ticket-list');
-            list.innerHTML = "Loading...";
-            let q = query(collection(db, "tickets"), orderBy("timestamp", "desc"));
-            if(auth.currentUser.email !== ADMIN_EMAIL) {
-                q = query(collection(db, "tickets"), where("userId", "==", auth.currentUser.uid), orderBy("timestamp", "desc"));
-            }
-            const snap = await getDocs(q);
-            list.innerHTML = "";
-            snap.forEach(tDoc => {
-                const d = tDoc.data();
-                const item = document.createElement('div');
-                item.className = "news-card";
-                item.style.cursor = "pointer";
-                item.innerHTML = `<strong>${d.subject}</strong> <span style="float:right; color:${d.status === 'Open' ? '#0f0' : '#777'}">${d.status}</span><br><small>${d.userEmail}</small>`;
-                item.onclick = () => openThread(tDoc.id, d);
-                list.appendChild(item);
-            });
-        }
-
-        function openThread(id, data) {
-            activeTicketId = id;
-            document.getElementById('list-view').style.display = 'none';
-            document.getElementById('thread-view').style.display = 'block';
-            document.getElementById('active-subject').innerText = data.subject;
-            document.getElementById('active-status').innerText = "Status: " + data.status;
-
-            const chatForm = document.getElementById('chat-form');
-            const resBox = document.getElementById('resolution-box');
-            const adminArea = document.getElementById('admin-close-area');
-
-            if (data.status === "Closed") {
-                chatForm.style.display = 'none';
-                adminArea.style.display = 'none';
-                resBox.style.display = 'block';
-                document.getElementById('resolution-text').innerText = data.closeReason || "No reason recorded.";
-            } else {
-                chatForm.style.display = 'flex';
-                resBox.style.display = 'none';
-                adminArea.style.display = (auth.currentUser.email === ADMIN_EMAIL) ? 'block' : 'none';
-            }
-
-            document.getElementById('close-ticket-btn').onclick = async () => {
-                const r = document.getElementById('close-reason').value;
-                if(!r) return alert("Resolution required.");
-                await updateDoc(doc(db, "tickets", id), { status: "Closed", closeReason: r });
-                
-                sendProtocolEmail("template_8ajam7i", {
-                    subject: data.subject,
-                    reason: r,
-                    to_email: data.userEmail 
-                });
-
-                document.getElementById('back-btn').click();
-            };
-
-            if(chatUnsubscribe) chatUnsubscribe();
-            chatUnsubscribe = onSnapshot(query(collection(db, "tickets", id, "messages"), orderBy("timestamp", "asc")), snap => {
-                const box = document.getElementById('chat-box');
-                box.innerHTML = "";
-                snap.forEach(mDoc => {
-                    const m = mDoc.data();
-                    const isMe = m.sender === auth.currentUser.email;
-                    box.innerHTML += `<div style="align-self:${isMe ? 'flex-end' : 'flex-start'}; background:${isMe ? 'var(--crimson)' : '#222'}; padding:8px 12px; border-radius:8px; max-width:80%; font-size:0.9rem;">
-                        <small style="display:block; opacity:0.5; font-size:0.6rem;">${m.sender}</small>${m.text}</div>`;
-                });
-                box.scrollTop = box.scrollHeight;
-            });
-        }
-
-        document.getElementById('back-btn').onclick = () => {
-            document.getElementById('list-view').style.display = 'block';
-            document.getElementById('thread-view').style.display = 'none';
-            if(chatUnsubscribe) chatUnsubscribe();
-            fetchTickets();
-        };
-
-        document.getElementById('chat-form').onsubmit = async (e) => {
-            e.preventDefault();
-            const input = document.getElementById('chat-input');
-            await addDoc(collection(db, "tickets", activeTicketId, "messages"), {
-                text: input.value, sender: auth.currentUser.email, timestamp: serverTimestamp()
-            });
-            input.value = "";
-        };
-
-        document.getElementById('ticket-form').onsubmit = async (e) => {
-            e.preventDefault();
-            const subj = document.getElementById('ticket-subject').value;
-            const msg = document.getElementById('ticket-msg').value;
-            await addDoc(collection(db, "tickets"), {
-                userId: auth.currentUser.uid,
-                userEmail: auth.currentUser.email,
-                subject: subj, message: msg, status: "Open", timestamp: serverTimestamp()
-            });
-
-            sendProtocolEmail("template_mdz12kv", {
-                subject: subj,
-                message: msg,
-                userEmail: auth.currentUser.email
-            });
-
-            document.getElementById('ticket-form').reset();
-            fetchTickets();
-        };
-
-        onAuthStateChanged(auth, user => {
-            const nav = document.getElementById('nav-auth-link');
-            if(user) {
-                nav.innerText = "Dashboard";
-                document.getElementById('login-container').style.display = 'none';
-                document.getElementById('dashboard').style.display = 'block';
-                document.getElementById('ticket-locked').style.display = 'none';
-                document.getElementById('ticket-system').style.display = 'block';
-                if(user.email === ADMIN_EMAIL) document.getElementById('admin-panel').style.display = 'block';
-            } else {
-                nav.innerText = "Login";
-                document.getElementById('login-container').style.display = 'block';
-                document.getElementById('dashboard').style.display = 'none';
-                document.getElementById('ticket-locked').style.display = 'block';
-                document.getElementById('ticket-system').style.display = 'none';
-            }
-            navigate();
-        });
-
-        let isLogin = true;
-        document.getElementById('toggle-auth').onclick = () => {
-            isLogin = !isLogin;
-            document.getElementById('auth-title').innerText = isLogin ? "Login" : "Register";
-            document.getElementById('toggle-auth').innerText = isLogin ? "Register" : "Login";
-        };
-
-        document.getElementById('login-form').onsubmit = (e) => {
-            e.preventDefault();
-            const email = document.getElementById('email').value;
-            const pass = document.getElementById('password').value;
-            if(isLogin) signInWithEmailAndPassword(auth, email, pass).catch(err => alert(err.message));
-            else createUserWithEmailAndPassword(auth, email, pass).catch(err => alert(err.message));
-        };
-
-        document.getElementById('logout-btn').onclick = () => signOut(auth);
     </script>
 </body>
 </html>
