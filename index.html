@@ -52,15 +52,21 @@
         .chat-header { padding: 15px; border-bottom: 1px solid #222; font-weight: bold; }
         .messages-container { flex-grow: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
         
-        /* Discovery UI */
         #discovery-box { display: none; flex-wrap: wrap; gap: 20px; padding: 20px; align-content: flex-start; overflow-y:auto; flex-grow:1;}
         .discovery-card { background: #111; border: 1px solid #333; border-radius: 8px; padding: 20px; width: 250px; text-align: center; }
         .discovery-card h3 { margin-top: 0; color: var(--crimson); }
         
-        .msg { display: flex; flex-direction: column; }
-        .msg-sender { font-weight: bold; font-size: 0.9rem; margin-bottom: 4px; color: var(--crimson); }
-        .msg-text { background: #000; padding: 10px; border-radius: 0 8px 8px 8px; width: fit-content; max-width: 80%; }
+        .msg { display: flex; flex-direction: column; width: 100%; }
+        .msg-sender { font-weight: bold; font-size: 0.9rem; margin-bottom: 4px; color: var(--crimson); display: flex; align-items: center; gap: 10px; }
+        .msg-text { background: #000; padding: 10px; border-radius: 0 8px 8px 8px; width: fit-content; max-width: 80%; line-height: 1.4; }
         
+        /* Pinging Styles */
+        .ping-highlight { background: rgba(220, 20, 60, 0.15) !important; border-left: 3px solid var(--crimson); }
+        .mention { color: var(--crimson); font-weight: bold; background: rgba(220, 20, 60, 0.2); padding: 0 4px; border-radius: 3px; }
+        
+        .promote-btn { background: #333; border: 1px solid #555; color: #fff; font-size: 0.7rem; cursor: pointer; padding: 2px 6px; border-radius: 3px; }
+        .promote-btn:hover { background: #555; }
+
         .chat-input-area { padding: 20px; background: var(--panel); border-top: 1px solid #222; }
         .chat-input-wrapper { display: flex; gap: 10px; }
         .chat-input-wrapper input { margin: 0; }
@@ -110,8 +116,7 @@
                 <div class="server-icon server-discovery" id="btn-discovery" title="Discover Servers" style="margin-bottom:0;">🧭</div>
                 <hr style="width: 50%; border: none; border-top: 2px solid #333; margin: 15px 0;">
                 
-                <div id="server-list" style="display: flex; flex-direction: column; width: 100%; align-items: center;">
-                    </div>
+                <div id="server-list" style="display: flex; flex-direction: column; width: 100%; align-items: center;"></div>
                 
                 <hr style="width: 50%; border: none; border-top: 2px solid #333; margin: 15px 0;">
                 <div class="server-icon server-add" id="add-server-btn" title="Create New Server">+</div>
@@ -120,10 +125,9 @@
             <div class="channel-sidebar">
                 <div class="channel-header">
                     <span id="active-server-name">No Server Selected</span>
-                    <button id="add-channel-btn" style="background:transparent; border:none; color:white; cursor:pointer; font-size:1.2rem; display:none;" title="Add Channel">+</button>
+                    <button id="add-channel-btn" style="background:transparent; border:none; color:white; cursor:pointer; font-size:1.2rem; display:none;" title="Add Channel (Admin Only)">+</button>
                 </div>
-                <div class="channel-list" id="channel-list">
-                    </div>
+                <div class="channel-list" id="channel-list"></div>
             </div>
 
             <div class="chat-area">
@@ -132,13 +136,12 @@
                 <div class="messages-container" id="chat-box"></div>
                 <form class="chat-input-area" id="chat-form" style="display:none;">
                     <div class="chat-input-wrapper">
-                        <input type="text" id="chat-input" placeholder="Message..." required autocomplete="off">
+                        <input type="text" id="chat-input" placeholder="Message... (Use @Name to ping)" required autocomplete="off">
                         <button type="submit" class="btn-primary">Send</button>
                     </div>
                 </form>
 
-                <div id="discovery-box">
-                    </div>
+                <div id="discovery-box"></div>
             </div>
         </div>
     </main>
@@ -240,8 +243,6 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence, updateProfile } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-        
-        // --- ADDED arrayUnion HERE ---
         import { getFirestore, collection, addDoc, getDocs, query, orderBy, where, doc, onSnapshot, updateDoc, serverTimestamp, arrayUnion } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
         const firebaseConfig = {
@@ -260,12 +261,27 @@
         setPersistence(auth, browserLocalPersistence);
 
         let activeServerId = null;
+        let activeServerAdmins = []; 
         let activeChannelId = null;
+        
         let chatterServersUnsub = null;
         let chatterChannelsUnsub = null;
         let chatterMessagesUnsub = null;
-        let activeTicketId = null;
         let ticketChatUnsubscribe = null;
+        let activeTicketId = null;
+
+        // --- NOTIFICATION HELPER ---
+        function requestNotificationPermission() {
+            if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
+                Notification.requestPermission();
+            }
+        }
+
+        function triggerBrowserNotification(title, body) {
+            if ("Notification" in window && Notification.permission === "granted") {
+                new Notification(title, { body: body, icon: "https://cdn-icons-png.flaticon.com/512/3237/3237472.png" });
+            }
+        }
 
         window.routeTo = function(page) {
             document.querySelectorAll('.page-content').forEach(p => p.style.display = 'none');
@@ -284,6 +300,9 @@
         onAuthStateChanged(auth, user => {
             const navAuth = document.getElementById('nav-auth-link');
             if(user) {
+                // Request notification permission on login
+                requestNotificationPermission();
+
                 navAuth.innerText = "Dashboard";
                 document.getElementById('login-container').style.display = 'none';
                 document.getElementById('dashboard-container').style.display = 'block';
@@ -357,7 +376,6 @@
             if(chatterServersUnsub) return;
             const serverList = document.getElementById('server-list');
             
-            // 1. Fetch ONLY servers where the current user is in the "members" array
             const myServersQuery = query(collection(db, "discord_servers"), where("members", "array-contains", auth.currentUser.uid));
             
             chatterServersUnsub = onSnapshot(myServersQuery, snap => {
@@ -369,13 +387,13 @@
                     el.className = `server-icon ${activeServerId === docSnap.id ? 'active' : ''}`;
                     el.innerText = initial;
                     el.title = data.name;
-                    el.onclick = () => selectServer(docSnap.id, data.name, el);
+                    el.onclick = () => selectServer(docSnap.id, data, el);
                     serverList.appendChild(el);
                 });
             });
         }
 
-        // Create Server (Automatically adds creator to members)
+        // CREATE SERVER
         document.getElementById('add-server-btn').onclick = async () => {
             if(!auth.currentUser) return;
             const name = prompt("Enter Server Name:");
@@ -384,17 +402,16 @@
                     const newServer = await addDoc(collection(db, "discord_servers"), { 
                         name: name, 
                         owner: auth.currentUser.uid, 
-                        members: [auth.currentUser.uid], // <-- YOU ARE A MEMBER NOW
+                        members: [auth.currentUser.uid], 
+                        admins: [auth.currentUser.uid], 
                         timestamp: serverTimestamp() 
                     });
                     await addDoc(collection(db, "discord_servers", newServer.id, "channels"), { name: "general", timestamp: serverTimestamp() });
-                } catch(err) {
-                    alert("Failed to create server. " + err.message);
-                }
+                } catch(err) { alert("Failed to create server. " + err.message); }
             }
         };
 
-        // Open Discovery Tab
+        // DISCOVERY
         document.getElementById('btn-discovery').onclick = async () => {
             document.querySelectorAll('.server-icon').forEach(el => el.classList.remove('active'));
             document.getElementById('btn-discovery').classList.add('active');
@@ -402,7 +419,6 @@
             document.getElementById('active-server-name').innerText = "Discovery";
             document.getElementById('channel-list').innerHTML = "";
             document.getElementById('add-channel-btn').style.display = 'none';
-            
             document.getElementById('chat-box').style.display = 'none';
             document.getElementById('chat-form').style.display = 'none';
             document.getElementById('active-channel-name').innerText = "Discover Public Servers";
@@ -411,20 +427,14 @@
             discBox.style.display = 'flex';
             discBox.innerHTML = "Loading servers...";
 
-            // Fetch ALL servers
             const snap = await getDocs(collection(db, "discord_servers"));
             discBox.innerHTML = "";
             
-            if(snap.empty) {
-                discBox.innerHTML = "<p style='color:#aaa; width:100%; text-align:center;'>No servers exist on the grid yet.</p>";
-                return;
-            }
+            if(snap.empty) { discBox.innerHTML = "<p style='color:#aaa; width:100%; text-align:center;'>No servers exist.</p>"; return; }
 
             snap.forEach(docSnap => {
                 const data = docSnap.data();
                 const membersList = data.members || [];
-                
-                // Only show servers you ARE NOT currently in
                 if(!membersList.includes(auth.currentUser.uid)) {
                     discBox.innerHTML += `
                         <div class="discovery-card">
@@ -436,32 +446,30 @@
                 }
             });
 
-            if(discBox.innerHTML === "") {
-                discBox.innerHTML = "<p style='color:#aaa; width:100%; text-align:center;'>You have joined all available servers!</p>";
-            }
+            if(discBox.innerHTML === "") { discBox.innerHTML = "<p style='color:#aaa; width:100%; text-align:center;'>You have joined all available servers!</p>"; }
         };
 
-        // Join a Server from Discovery
         window.joinServer = async function(serverId) {
             try {
-                await updateDoc(doc(db, "discord_servers", serverId), {
-                    members: arrayUnion(auth.currentUser.uid)
-                });
-                alert("Successfully joined! It is now in your sidebar.");
-                document.getElementById('btn-discovery').click(); // Refresh discovery
-            } catch(err) {
-                alert("Failed to join. " + err.message);
-            }
+                await updateDoc(doc(db, "discord_servers", serverId), { members: arrayUnion(auth.currentUser.uid) });
+                document.getElementById('btn-discovery').click();
+            } catch(err) { alert("Failed to join. " + err.message); }
         };
 
-        function selectServer(serverId, serverName, element) {
+        // SELECT SERVER & CHECK ADMIN STATUS
+        function selectServer(serverId, serverData, element) {
             document.getElementById('chat-box').style.display = 'flex';
             document.getElementById('discovery-box').style.display = 'none';
 
             activeServerId = serverId;
+            activeServerAdmins = serverData.admins || [serverData.owner];
             activeChannelId = null;
-            document.getElementById('active-server-name').innerText = serverName;
-            document.getElementById('add-channel-btn').style.display = 'block';
+            
+            document.getElementById('active-server-name').innerText = serverData.name;
+            
+            const amIAdmin = activeServerAdmins.includes(auth.currentUser.uid);
+            document.getElementById('add-channel-btn').style.display = amIAdmin ? 'block' : 'none';
+            
             document.getElementById('active-channel-name').innerText = "Select a channel";
             document.getElementById('chat-form').style.display = 'none';
             document.getElementById('chat-box').innerHTML = "";
@@ -485,6 +493,7 @@
             });
         }
 
+        // ADD CHANNEL
         document.getElementById('add-channel-btn').onclick = async () => {
             if(!activeServerId) return;
             const name = prompt("Enter Channel Name:");
@@ -498,6 +507,7 @@
             }
         };
 
+        // RENDER CHAT AND PINGS AND NOTIFICATIONS
         function selectChannel(channelId, channelName, element) {
             activeChannelId = channelId;
             document.getElementById('active-channel-name').innerText = `# ${channelName}`;
@@ -506,24 +516,76 @@
             document.querySelectorAll('.channel-item').forEach(el => el.classList.remove('active'));
             element.classList.add('active');
 
+            const amIAdmin = activeServerAdmins.includes(auth.currentUser.uid);
+            const myName = auth.currentUser.displayName || auth.currentUser.email.split('@')[0];
+
             if(chatterMessagesUnsub) chatterMessagesUnsub();
             const box = document.getElementById('chat-box');
             
+            let isInitialLoad = true;
+
             chatterMessagesUnsub = onSnapshot(query(collection(db, "discord_servers", activeServerId, "channels", activeChannelId, "messages"), orderBy("timestamp", "asc")), snap => {
                 box.innerHTML = "";
+                
                 snap.forEach(mDoc => {
                     const m = mDoc.data();
                     const nameToUse = m.senderName || m.senderEmail.split('@')[0];
+                    
+                    let formattedText = m.text.replace(/@(\w+)/g, '<span class="mention">@$1</span>');
+                    const isPinged = m.text.includes(`@${myName}`);
+                    const pingClass = isPinged ? 'ping-highlight' : '';
+
+                    let promoteHTML = '';
+                    if(amIAdmin && m.senderUid !== auth.currentUser.uid && !activeServerAdmins.includes(m.senderUid)) {
+                        promoteHTML = `<button class="promote-btn" onclick="promoteAdmin('${m.senderUid}')">👑 Promote</button>`;
+                    }
+
                     box.innerHTML += `
                         <div class="msg">
-                            <span class="msg-sender">${nameToUse}</span>
-                            <div class="msg-text">${m.text}</div>
+                            <span class="msg-sender">${nameToUse} ${promoteHTML}</span>
+                            <div class="msg-text ${pingClass}">${formattedText}</div>
                         </div>`;
                 });
                 box.scrollTop = box.scrollHeight;
+
+                // Fire notifications for NEW messages only
+                if (!isInitialLoad) {
+                    snap.docChanges().forEach(change => {
+                        if (change.type === 'added') {
+                            const m = change.doc.data();
+                            if (m.senderUid !== auth.currentUser.uid) {
+                                const senderDisplay = m.senderName || m.senderEmail.split('@')[0];
+                                const isPinged = m.text.includes(`@${myName}`);
+
+                                if (isPinged) {
+                                    triggerBrowserNotification(`You were pinged in #${channelName}`, `${senderDisplay}: ${m.text}`);
+                                } else if (document.hidden) {
+                                    triggerBrowserNotification(`New message in #${channelName}`, `${senderDisplay}: ${m.text}`);
+                                }
+                            }
+                        }
+                    });
+                }
+                isInitialLoad = false;
             });
         }
 
+        // PROMOTE ADMIN ACTION
+        window.promoteAdmin = async function(targetUid) {
+            if(confirm("Make this user an Admin? They will be able to create channels and promote others.")) {
+                try {
+                    await updateDoc(doc(db, "discord_servers", activeServerId), {
+                        admins: arrayUnion(targetUid)
+                    });
+                    activeServerAdmins.push(targetUid); 
+                    alert("User Promoted to Admin.");
+                } catch(err) {
+                    alert("Failed to promote user. " + err.message);
+                }
+            }
+        };
+
+        // SEND MESSAGE
         document.getElementById('chat-form').onsubmit = async (e) => {
             e.preventDefault();
             const input = document.getElementById('chat-input');
@@ -532,6 +594,7 @@
             try {
                 await addDoc(collection(db, "discord_servers", activeServerId, "channels", activeChannelId, "messages"), {
                     text: input.value,
+                    senderUid: auth.currentUser.uid,
                     senderEmail: auth.currentUser.email,
                     senderName: auth.currentUser.displayName || "",
                     timestamp: serverTimestamp()
@@ -541,14 +604,13 @@
         };
 
         // ==========================================
-        // --- SUPPORT TICKETS (SEPARATED LOGIC) ----
+        // --- SUPPORT TICKETS ----------------------
         // ==========================================
         window.fetchTickets = async function() {
             if(!auth.currentUser) return;
             const list = document.getElementById('ticket-list');
             list.innerHTML = "Syncing Grid...";
             
-            // ADMIN VS USER CHECK IS STRICTLY HERE FOR TICKETS
             let q = query(collection(db, "tickets"), orderBy("timestamp", "desc"));
             if(auth.currentUser.email !== ADMIN_EMAIL) {
                 q = query(collection(db, "tickets"), where("userId", "==", auth.currentUser.uid), orderBy("timestamp", "desc"));
@@ -566,10 +628,7 @@
                     item.onclick = () => openThread(tDoc.id, d);
                     list.appendChild(item);
                 });
-            } catch(err) {
-                list.innerHTML = "Error loading tickets. You may need to generate a Firebase Index (Check console).";
-                console.error(err);
-            }
+            } catch(err) { console.error(err); }
         }
 
         function openThread(id, data) {
@@ -598,17 +657,12 @@
                 const r = document.getElementById('close-reason').value;
                 if(!r) return alert("Resolution required.");
                 await updateDoc(doc(db, "tickets", id), { status: "Closed", closeReason: r });
-                
-                emailjs.send("service_ka3dbxo", "template_8ajam7i", {
-                    subject: data.subject,
-                    reason: r,
-                    to_email: data.userEmail 
-                }).then(() => console.log("Email Sent.")).catch(err => console.error(err));
-
                 document.getElementById('back-btn').click();
             };
 
+            let isInitialLoad = true;
             if(ticketChatUnsubscribe) ticketChatUnsubscribe();
+            
             ticketChatUnsubscribe = onSnapshot(query(collection(db, "tickets", id, "messages"), orderBy("timestamp", "asc")), snap => {
                 const box = document.getElementById('ticket-chat-box');
                 box.innerHTML = "";
@@ -619,6 +673,18 @@
                         <small style="display:block; opacity:0.5; font-size:0.6rem;">${m.senderName || m.sender}</small>${m.text}</div>`;
                 });
                 box.scrollTop = box.scrollHeight;
+
+                if (!isInitialLoad && document.hidden) {
+                    snap.docChanges().forEach(change => {
+                        if (change.type === 'added') {
+                            const m = change.doc.data();
+                            if (m.sender !== auth.currentUser.email) {
+                                triggerBrowserNotification("Support Ticket Update", `${m.senderName || m.sender}: ${m.text}`);
+                            }
+                        }
+                    });
+                }
+                isInitialLoad = false;
             });
         }
 
@@ -647,13 +713,6 @@
                 userEmail: auth.currentUser.email,
                 subject: subj, message: msg, status: "Open", timestamp: serverTimestamp()
             });
-
-            emailjs.send("service_ka3dbxo", "template_mdz12kv", {
-                subject: subj,
-                message: msg,
-                userEmail: auth.currentUser.email
-            }).then(() => console.log("Email Sent.")).catch(err => console.error(err));
-
             document.getElementById('ticket-form').reset();
             fetchTickets();
         };
