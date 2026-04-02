@@ -35,10 +35,10 @@
         #page-chatter { padding: 0; overflow: hidden; }
         .chatter-layout { display: flex; height: 100%; }
         
-        .server-sidebar { width: 80px; background: #050505; border-right: 1px solid #222; display: flex; flex-direction: column; align-items: center; padding-top: 15px; gap: 15px; overflow-y: auto; }
-        .server-icon { width: 50px; height: 50px; border-radius: 50%; background: #222; display: flex; justify-content: center; align-items: center; cursor: pointer; font-weight: bold; transition: 0.2s; color: white; }
+        .server-sidebar { width: 80px; background: #050505; border-right: 1px solid #222; display: flex; flex-direction: column; align-items: center; padding-top: 15px; padding-bottom: 15px; overflow-y: auto; }
+        .server-icon { width: 50px; height: 50px; border-radius: 50%; background: #222; display: flex; justify-content: center; align-items: center; cursor: pointer; font-weight: bold; transition: 0.2s; color: white; flex-shrink: 0;}
         .server-icon:hover, .server-icon.active { background: var(--crimson); border-radius: 15px; }
-        .server-add { background: #111; color: #0f0; border: 1px dashed #0f0; }
+        .server-add { background: #111; color: #0f0; border: 1px dashed #0f0; margin-top: 10px; }
 
         .channel-sidebar { width: 240px; background: #111; border-right: 1px solid #222; display: flex; flex-direction: column; }
         .channel-header { padding: 15px; font-weight: bold; border-bottom: 1px solid #222; display: flex; justify-content: space-between; align-items: center; }
@@ -99,13 +99,17 @@
         </div>
 
         <div id="chatter-system" class="chatter-layout" style="display:none;">
-            <div class="server-sidebar" id="server-list">
-                </div>
+            <div class="server-sidebar">
+                <div id="server-list" style="display: flex; flex-direction: column; gap: 15px; width: 100%; align-items: center;">
+                    </div>
+                <hr style="width: 50%; border: none; border-top: 2px solid #333; margin: 15px 0;">
+                <div class="server-icon server-add" id="add-server-btn" title="Create New Server">+</div>
+            </div>
 
             <div class="channel-sidebar">
                 <div class="channel-header">
-                    <span id="active-server-name">No Server</span>
-                    <button id="add-channel-btn" style="background:transparent; border:none; color:white; cursor:pointer; font-size:1.2rem; display:none;">+</button>
+                    <span id="active-server-name">No Server Selected</span>
+                    <button id="add-channel-btn" style="background:transparent; border:none; color:white; cursor:pointer; font-size:1.2rem; display:none;" title="Add Channel">+</button>
                 </div>
                 <div class="channel-list" id="channel-list">
                     </div>
@@ -154,11 +158,23 @@
                     <button id="back-btn" class="btn-secondary" style="margin-bottom:15px;">&larr; Back</button>
                     <h2 id="active-subject" style="margin:0 0 5px;"></h2>
                     <p id="active-status" style="font-size:0.8rem; margin-bottom:15px; color:#aaa;"></p>
+                    
+                    <div id="resolution-box" style="display:none; background:rgba(220, 20, 60, 0.1); border:1px solid var(--crimson); padding:10px; margin-bottom:15px;">
+                        <strong style="color:var(--crimson);">Resolution:</strong>
+                        <p id="resolution-text" style="margin-top:5px;"></p>
+                    </div>
+
                     <div id="ticket-chat-box" style="height:300px; overflow-y:auto; display:flex; flex-direction:column; gap:10px; padding:10px; background:#000; margin-bottom:15px;"></div>
+                    
                     <form id="ticket-chat-form" style="display:flex; gap:10px;">
                         <input type="text" id="ticket-chat-input" placeholder="Message..." required style="margin:0;">
                         <button type="submit" class="btn-primary">Send</button>
                     </form>
+
+                    <div id="admin-close-area" style="display:none; margin-top:15px; border-top:1px solid #333; padding-top:15px;">
+                        <textarea id="close-reason" placeholder="Resolution reason..." rows="2"></textarea>
+                        <button id="close-ticket-btn" style="width:100%; background:orange; color:black; border:none; padding:10px; font-weight:bold; cursor:pointer;">Finalize & Close Ticket</button>
+                    </div>
                 </div>
             </div>
         </section>
@@ -210,7 +226,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence, updateProfile } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, getDocs, query, orderBy, where, doc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, getDocs, query, orderBy, where, doc, onSnapshot, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBSSJKDrFJ1_qlliZqgw34CY2TSaKOxxxM",
@@ -227,12 +243,14 @@
         const db = getFirestore(app);
         setPersistence(auth, browserLocalPersistence);
 
-        // State for Chatter
+        // State variables
         let activeServerId = null;
         let activeChannelId = null;
         let chatterServersUnsub = null;
         let chatterChannelsUnsub = null;
         let chatterMessagesUnsub = null;
+        let activeTicketId = null;
+        let ticketChatUnsubscribe = null;
 
         // Routing
         window.routeTo = function(page) {
@@ -322,9 +340,10 @@
 
         // --- CHATTER (SERVERS & CHANNELS) ---
         function initChatter() {
-            if(chatterServersUnsub) return; // already loaded
+            if(chatterServersUnsub) return;
             const serverList = document.getElementById('server-list');
             
+            // Listen for servers
             chatterServersUnsub = onSnapshot(query(collection(db, "discord_servers"), orderBy("timestamp", "asc")), snap => {
                 serverList.innerHTML = "";
                 snap.forEach(docSnap => {
@@ -334,27 +353,27 @@
                     el.className = `server-icon ${activeServerId === docSnap.id ? 'active' : ''}`;
                     el.innerText = initial;
                     el.title = data.name;
-                    el.onclick = () => selectServer(docSnap.id, data.name);
+                    el.onclick = () => selectServer(docSnap.id, data.name, el);
                     serverList.appendChild(el);
                 });
-
-                // Add Server Button
-                const addBtn = document.createElement('div');
-                addBtn.className = "server-icon server-add";
-                addBtn.innerText = "+";
-                addBtn.onclick = async () => {
-                    const name = prompt("Enter Server Name:");
-                    if(name) {
-                        const newServer = await addDoc(collection(db, "discord_servers"), { name, owner: auth.currentUser.uid, timestamp: serverTimestamp() });
-                        // Auto-create general channel
-                        await addDoc(collection(db, "discord_servers", newServer.id, "channels"), { name: "general", timestamp: serverTimestamp() });
-                    }
-                };
-                serverList.appendChild(addBtn);
             });
         }
 
-        function selectServer(serverId, serverName) {
+        // STATIC ADD SERVER BUTTON LOGIC
+        document.getElementById('add-server-btn').onclick = async () => {
+            if(!auth.currentUser) return alert("Must be logged in.");
+            const name = prompt("Enter Server Name:");
+            if(name) {
+                try {
+                    const newServer = await addDoc(collection(db, "discord_servers"), { name, owner: auth.currentUser.uid, timestamp: serverTimestamp() });
+                    await addDoc(collection(db, "discord_servers", newServer.id, "channels"), { name: "general", timestamp: serverTimestamp() });
+                } catch(err) {
+                    alert("Failed to create server. Check Firebase Rules! Error: " + err.message);
+                }
+            }
+        };
+
+        function selectServer(serverId, serverName, element) {
             activeServerId = serverId;
             activeChannelId = null;
             document.getElementById('active-server-name').innerText = serverName;
@@ -363,9 +382,8 @@
             document.getElementById('chat-form').style.display = 'none';
             document.getElementById('chat-box').innerHTML = "";
             
-            // Highlight selected server visually
             document.querySelectorAll('.server-icon').forEach(el => el.classList.remove('active'));
-            event.target.classList.add('active');
+            if(element) element.classList.add('active');
 
             if(chatterChannelsUnsub) chatterChannelsUnsub();
             const channelList = document.getElementById('channel-list');
@@ -385,12 +403,16 @@
 
         document.getElementById('add-channel-btn').onclick = async () => {
             if(!activeServerId) return;
-            const name = prompt("Enter Channel Name (e.g. general, support):");
+            const name = prompt("Enter Channel Name:");
             if(name) {
-                await addDoc(collection(db, "discord_servers", activeServerId, "channels"), {
-                    name: name.toLowerCase().replace(/\s+/g, '-'),
-                    timestamp: serverTimestamp()
-                });
+                try {
+                    await addDoc(collection(db, "discord_servers", activeServerId, "channels"), {
+                        name: name.toLowerCase().replace(/\s+/g, '-'),
+                        timestamp: serverTimestamp()
+                    });
+                } catch(err) {
+                    alert("Failed to add channel. Error: " + err.message);
+                }
             }
         };
 
@@ -425,18 +447,125 @@
             const input = document.getElementById('chat-input');
             if(!input.value.trim() || !activeServerId || !activeChannelId) return;
 
-            await addDoc(collection(db, "discord_servers", activeServerId, "channels", activeChannelId, "messages"), {
-                text: input.value,
-                senderEmail: auth.currentUser.email,
-                senderName: auth.currentUser.displayName || "",
-                timestamp: serverTimestamp()
+            try {
+                await addDoc(collection(db, "discord_servers", activeServerId, "channels", activeChannelId, "messages"), {
+                    text: input.value,
+                    senderEmail: auth.currentUser.email,
+                    senderName: auth.currentUser.displayName || "",
+                    timestamp: serverTimestamp()
+                });
+                input.value = "";
+            } catch(err) {
+                alert("Failed to send. Error: " + err.message);
+            }
+        };
+
+        // --- SUPPORT TICKETS RESTORED FULLY ---
+        window.fetchTickets = async function() {
+            if(!auth.currentUser) return;
+            const list = document.getElementById('ticket-list');
+            list.innerHTML = "Syncing Grid...";
+            let q = query(collection(db, "tickets"), orderBy("timestamp", "desc"));
+            if(auth.currentUser.email !== ADMIN_EMAIL) {
+                q = query(collection(db, "tickets"), where("userId", "==", auth.currentUser.uid), orderBy("timestamp", "desc"));
+            }
+            const snap = await getDocs(q);
+            list.innerHTML = "";
+            snap.forEach(tDoc => {
+                const d = tDoc.data();
+                const item = document.createElement('div');
+                item.className = "auth-card";
+                item.style.cursor = "pointer";
+                item.innerHTML = `<strong>${d.subject}</strong> <span style="float:right; color:${d.status === 'Open' ? '#0f0' : '#777'}">${d.status}</span><br><small>${d.userEmail}</small>`;
+                item.onclick = () => openThread(tDoc.id, d);
+                list.appendChild(item);
+            });
+        }
+
+        function openThread(id, data) {
+            activeTicketId = id;
+            document.getElementById('list-view').style.display = 'none';
+            document.getElementById('thread-view').style.display = 'block';
+            document.getElementById('active-subject').innerText = data.subject;
+            document.getElementById('active-status').innerText = "Status: " + data.status;
+
+            const chatForm = document.getElementById('ticket-chat-form');
+            const resBox = document.getElementById('resolution-box');
+            const adminArea = document.getElementById('admin-close-area');
+
+            if (data.status === "Closed") {
+                chatForm.style.display = 'none';
+                adminArea.style.display = 'none';
+                resBox.style.display = 'block';
+                document.getElementById('resolution-text').innerText = data.closeReason || "No reason recorded.";
+            } else {
+                chatForm.style.display = 'flex';
+                resBox.style.display = 'none';
+                adminArea.style.display = (auth.currentUser.email === ADMIN_EMAIL) ? 'block' : 'none';
+            }
+
+            document.getElementById('close-ticket-btn').onclick = async () => {
+                const r = document.getElementById('close-reason').value;
+                if(!r) return alert("Resolution required.");
+                await updateDoc(doc(db, "tickets", id), { status: "Closed", closeReason: r });
+                
+                emailjs.send("service_ka3dbxo", "template_8ajam7i", {
+                    subject: data.subject,
+                    reason: r,
+                    to_email: data.userEmail 
+                }).then(() => console.log("Email Sent.")).catch(err => console.error(err));
+
+                document.getElementById('back-btn').click();
+            };
+
+            if(ticketChatUnsubscribe) ticketChatUnsubscribe();
+            ticketChatUnsubscribe = onSnapshot(query(collection(db, "tickets", id, "messages"), orderBy("timestamp", "asc")), snap => {
+                const box = document.getElementById('ticket-chat-box');
+                box.innerHTML = "";
+                snap.forEach(mDoc => {
+                    const m = mDoc.data();
+                    const isMe = m.sender === auth.currentUser.email;
+                    box.innerHTML += `<div style="align-self:${isMe ? 'flex-end' : 'flex-start'}; background:${isMe ? 'var(--crimson)' : '#222'}; padding:8px 12px; border-radius:8px; max-width:80%; font-size:0.9rem;">
+                        <small style="display:block; opacity:0.5; font-size:0.6rem;">${m.senderName || m.sender}</small>${m.text}</div>`;
+                });
+                box.scrollTop = box.scrollHeight;
+            });
+        }
+
+        document.getElementById('back-btn').onclick = () => {
+            document.getElementById('list-view').style.display = 'block';
+            document.getElementById('thread-view').style.display = 'none';
+            if(ticketChatUnsubscribe) ticketChatUnsubscribe();
+            fetchTickets();
+        };
+
+        document.getElementById('ticket-chat-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const input = document.getElementById('ticket-chat-input');
+            await addDoc(collection(db, "tickets", activeTicketId, "messages"), {
+                text: input.value, sender: auth.currentUser.email, senderName: auth.currentUser.displayName || auth.currentUser.email, timestamp: serverTimestamp()
             });
             input.value = "";
         };
 
-        // --- SUPPORT TICKETS (Existing Logic) ---
-        window.fetchTickets = async function() {
-            // (Your previous fetchTickets logic remains exactly the same here, omitted for brevity but you know it works)
+        document.getElementById('ticket-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const subj = document.getElementById('ticket-subject').value;
+            const msg = document.getElementById('ticket-msg').value;
+            await addDoc(collection(db, "tickets"), {
+                userId: auth.currentUser.uid,
+                userEmail: auth.currentUser.email,
+                subject: subj, message: msg, status: "Open", timestamp: serverTimestamp()
+            });
+
+            emailjs.send("service_ka3dbxo", "template_mdz12kv", {
+                subject: subj,
+                message: msg,
+                userEmail: auth.currentUser.email
+            }).then(() => console.log("Email Sent.")).catch(err => console.error(err));
+
+            document.getElementById('ticket-form').reset();
+            fetchTickets();
         };
     </script>
 </body>
