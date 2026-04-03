@@ -1,276 +1,210 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence, updateProfile } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, getDoc, query, orderBy, where, doc, onSnapshot, updateDoc, serverTimestamp, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-
-const firebaseConfig = {
-    apiKey: "AIzaSyBSSJKDrFJ1_qlliZqgw34CY2TSaKOxxxM",
-    authDomain: "crimsonflame-8169e.firebaseapp.com",
-    projectId: "crimsonflame-8169e",
-    storageBucket: "crimsonflame-8169e.firebasestorage.app",
-    messagingSenderId: "406321213530",
-    appId: "1:406321213530:web:92d27a69d34d147393a863"
-};
-
-const ADMIN_EMAIL = "allaboutwaterdiamond@gmail.com";
-const DEFAULT_PFP = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
-const IMGBB_API_KEY = "d5fd4e3e9fedc18b9bed075f980f12b7"; 
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-
-// --- EXPORT FUNCTIONS TO WINDOW (Fixes Menu Clicks) ---
-window.routeTo = function(page) {
-    document.querySelectorAll('.page-content').forEach(p => p.style.display = 'none');
-    const target = document.getElementById('page-' + page);
-    if(target) target.style.display = 'block';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CrimsonFlame VR Studio</title>
     
-    document.querySelectorAll('nav a').forEach(a => a.style.color = 'white');
-    const activeLink = document.querySelector(`nav a[onclick="routeTo('${page}')"]`);
-    if(activeLink) activeLink.style.color = 'var(--crimson)';
-
-    if(page === 'updates') fetchNews();
-    if(page === 'chatter' && auth.currentUser) initChatter();
-    if(page === 'tickets' && auth.currentUser) window.fetchTickets();
-};
-
-window.joinServer = async function(serverId) {
-    try {
-        await updateDoc(doc(db, "discord_servers", serverId), { members: arrayUnion(auth.currentUser.uid) });
-        if(document.getElementById('btn-discovery')) document.getElementById('btn-discovery').click();
-    } catch(err) { alert("Failed to join."); }
-};
-
-window.promoteAdmin = async function(targetUid) {
-    if(confirm("Make this user an Admin?")) {
-        await updateDoc(doc(db, "discord_servers", activeServerId), { admins: arrayUnion(targetUid) });
-        activeServerAdmins.push(targetUid); 
-    }
-};
-
-window.banUser = async function(targetUid) {
-    if(confirm("Ban this user?")) {
-        await updateDoc(doc(db, "discord_servers", activeServerId), { members: arrayRemove(targetUid), banned: arrayUnion(targetUid) });
-    }
-};
-
-// --- STATE ---
-let activeServerId = null;
-let activeServerAdmins = []; 
-let activeChannelId = null;
-let isGlobalAdmin = false; 
-let chatterServersUnsub = null;
-let chatterChannelsUnsub = null;
-let chatterMessagesUnsub = null;
-let ticketChatUnsubscribe = null;
-let activeTicketId = null;
-
-// --- AUTH & INITIALIZATION ---
-setPersistence(auth, browserLocalPersistence);
-
-onAuthStateChanged(auth, user => {
-    const navAuth = document.getElementById('nav-auth-link');
-    if(user) {
-        isGlobalAdmin = (user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase());
-        if(navAuth) navAuth.innerText = "Dashboard";
-        toggleChatterUI(true, user);
-    } else {
-        isGlobalAdmin = false;
-        if(navAuth) navAuth.innerText = "Login";
-        toggleChatterUI(false);
-    }
-});
-
-function toggleChatterUI(isLoggedIn, user = null) {
-    const locked = document.getElementById('chatter-locked');
-    const system = document.getElementById('chatter-system');
-    const tLocked = document.getElementById('ticket-locked');
-    const tSystem = document.getElementById('ticket-system');
-
-    if(isLoggedIn) {
-        if(locked) locked.style.display = 'none';
-        if(system) system.style.display = 'flex';
-        if(tLocked) tLocked.style.display = 'none';
-        if(tSystem) tSystem.style.display = 'block';
-        
-        // Update Profile UI
-        if(document.getElementById('user-display-email')) document.getElementById('user-display-email').innerText = user.email;
-        if(document.getElementById('display-name')) document.getElementById('display-name').value = user.displayName || "";
-        if(document.getElementById('dashboard-pfp-preview')) document.getElementById('dashboard-pfp-preview').src = user.photoURL || DEFAULT_PFP;
-        if(document.getElementById('admin-panel')) document.getElementById('admin-panel').style.display = isGlobalAdmin ? 'block' : 'none';
-        document.getElementById('login-container').style.display = 'none';
-        document.getElementById('dashboard-container').style.display = 'block';
-    } else {
-        if(locked) locked.style.display = 'flex';
-        if(system) system.style.display = 'none';
-        if(tLocked) tLocked.style.display = 'block';
-        if(tSystem) tSystem.style.display = 'none';
-        document.getElementById('login-container').style.display = 'block';
-        document.getElementById('dashboard-container').style.display = 'none';
-    }
-}
-
-// --- CHATTER CORE ---
-function initChatter() {
-    if(chatterServersUnsub) return;
-    const serverList = document.getElementById('server-list');
-    const myServersQuery = query(collection(db, "discord_servers"), where("members", "array-contains", auth.currentUser.uid));
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
     
-    chatterServersUnsub = onSnapshot(myServersQuery, snap => {
-        if(!serverList) return;
-        serverList.innerHTML = "";
-        snap.forEach(docSnap => {
-            const data = docSnap.data();
-            const el = document.createElement('div');
-            el.className = `server-icon ${activeServerId === docSnap.id ? 'active' : ''}`;
-            if(data.photoURL) el.innerHTML = `<img src="${data.photoURL}">`;
-            else el.innerText = data.name.substring(0,2).toUpperCase();
-            el.onclick = (e) => { e.preventDefault(); selectServer(docSnap.id, data, el); };
-            serverList.appendChild(el);
-        });
-    });
-}
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    <script type="text/javascript">
+        (function() { emailjs.init("invG_cVokMtCIdBX8"); })();
+    </script>
+</head>
+<body>
 
-function selectServer(serverId, serverData, element) {
-    activeServerId = serverId;
-    activeServerAdmins = serverData.admins || [serverData.owner];
-    
-    document.getElementById('chat-box').style.display = 'flex';
-    document.getElementById('discovery-box').style.display = 'none';
-    document.getElementById('active-server-name').innerText = serverData.name;
-    
-    const amIAdmin = activeServerAdmins.includes(auth.currentUser.uid) || isGlobalAdmin;
-    document.getElementById('add-channel-btn').style.display = amIAdmin ? 'block' : 'none';
-    document.getElementById('server-settings-btn').style.display = amIAdmin ? 'block' : 'none';
-    document.getElementById('chat-form').style.display = 'none';
-    document.getElementById('chat-box').innerHTML = "";
-    
-    document.querySelectorAll('.server-icon').forEach(el => el.classList.remove('active'));
-    if(element) element.classList.add('active');
+    <header>
+        <div class="header-container">
+            <h1 class="logo" onclick="routeTo('home')" style="cursor:pointer;">CRIMSON<span>FLAME</span></h1>
+            <nav>
+                <ul>
+                    <li><a onclick="routeTo('home')">Home</a></li>
+                    <li><a onclick="routeTo('updates')">Updates</a></li>
+                    <li><a onclick="routeTo('chatter')">Chatter</a></li>
+                    <li><a onclick="routeTo('tickets')">Support</a></li>
+                    <li><a onclick="routeTo('dashboard')" id="nav-auth-link">Dashboard</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
 
-    if(chatterChannelsUnsub) chatterChannelsUnsub();
-    chatterChannelsUnsub = onSnapshot(query(collection(db, "discord_servers", serverId, "channels"), orderBy("timestamp", "asc")), snap => {
-        const channelList = document.getElementById('channel-list');
-        channelList.innerHTML = "";
-        snap.forEach(docSnap => {
-            const cData = docSnap.data();
-            const el = document.createElement('div');
-            el.className = `channel-item ${activeChannelId === docSnap.id ? 'active' : ''}`;
-            el.innerText = cData.name;
-            el.onclick = (e) => { e.preventDefault(); selectChannel(docSnap.id, cData.name, el); };
-            channelList.appendChild(el);
-        });
-    });
-}
+    <main id="page-home" class="page-content" style="display:block;">
+        <div class="container" style="text-align: center; padding-top: 80px;">
+            <h2 class="hero-title">We are a VR Studio!</h2>
+            <p class="hero-subtitle">Pushing the boundaries of immersive reality.</p>
+        </div>
+    </main>
 
-function selectChannel(channelId, channelName, element) {
-    activeChannelId = channelId;
-    document.getElementById('active-channel-name').innerText = `# ${channelName}`;
-    document.getElementById('chat-form').style.display = 'block';
-    document.querySelectorAll('.channel-item').forEach(el => el.classList.remove('active'));
-    element.classList.add('active');
+    <main id="page-updates" class="page-content">
+        <section class="container">
+            <h2>Studio Updates</h2>
+            <div id="news-feed">Loading updates...</div>
+        </section>
+    </main>
 
-    if(chatterMessagesUnsub) chatterMessagesUnsub();
-    const box = document.getElementById('chat-box');
-    chatterMessagesUnsub = onSnapshot(query(collection(db, "discord_servers", activeServerId, "channels", activeChannelId, "messages"), orderBy("timestamp", "asc")), snap => {
-        box.innerHTML = "";
-        snap.forEach(mDoc => {
-            const m = mDoc.data();
-            const isMe = m.senderUid === auth.currentUser.uid;
-            const isPinged = m.text.includes(`@${auth.currentUser.displayName}`) || m.text.includes('@everyone');
-            
-            box.innerHTML += `
-                <div class="msg">
-                    <img src="${m.senderPfp || DEFAULT_PFP}" class="chat-pfp">
-                    <div class="msg-content">
-                        <span class="msg-sender">${m.senderName || 'User'}</span>
-                        <div class="msg-text ${isPinged ? 'ping-highlight' : ''}">${m.text.replace(/@(\w+)/g, '<span class="mention">@$1</span>')}</div>
+    <main id="page-chatter" class="page-content">
+        <div id="chatter-locked" class="auth-required-screen">
+            <div style="text-align:center;">
+                <h2>Authentication Required</h2>
+                <button onclick="routeTo('dashboard')" class="btn-primary">Go to Dashboard to Login</button>
+            </div>
+        </div>
+
+        <div id="chatter-system" class="chatter-layout" style="display:none;">
+            <div class="server-sidebar">
+                <div class="server-icon server-discovery" id="btn-discovery" title="Discover Servers">🧭</div>
+                <hr class="sidebar-divider">
+                <div id="server-list" class="server-list-container"></div>
+                <hr class="sidebar-divider">
+                <div class="server-icon server-add" id="add-server-btn" title="Create New Server">+</div>
+            </div>
+
+            <div class="channel-sidebar">
+                <div class="channel-header">
+                    <span id="active-server-name" class="truncate-text">No Server</span>
+                    <div style="display:flex; gap:8px;">
+                        <button id="server-settings-btn" class="icon-btn" style="display:none;" title="Server Settings (Admin)">⚙️</button>
+                        <button id="add-channel-btn" class="icon-btn" style="display:none;" title="Add Channel (Admin)">+</button>
                     </div>
-                </div>`;
-        });
-        box.scrollTop = box.scrollHeight;
-    });
-}
+                </div>
+                <div class="channel-list" id="channel-list"></div>
+            </div>
 
-// --- MESSAGE SENDING ---
-document.getElementById('chat-form').onsubmit = async (e) => {
-    e.preventDefault();
-    const input = document.getElementById('chat-input');
-    if(!input.value.trim() || !activeServerId || !activeChannelId) return;
+            <div class="chat-area">
+                <div class="chat-header" id="active-channel-name">Select a server to connect</div>
+                <div class="messages-container" id="chat-box"></div>
+                <form class="chat-input-area" id="chat-form" style="display:none;">
+                    <div class="chat-input-wrapper">
+                        <input type="text" id="chat-input" placeholder="Message... (Use @Name or @everyone)" required autocomplete="off">
+                        <button type="submit" class="btn-primary">Send</button>
+                    </div>
+                </form>
+                <div id="discovery-box"></div>
+            </div>
+        </div>
+    </main>
 
-    await addDoc(collection(db, "discord_servers", activeServerId, "channels", activeChannelId, "messages"), {
-        text: input.value, senderUid: auth.currentUser.uid, senderEmail: auth.currentUser.email,
-        senderName: auth.currentUser.displayName || "User", senderPfp: auth.currentUser.photoURL || "", timestamp: serverTimestamp()
-    });
-    input.value = "";
-};
+    <main id="page-tickets" class="page-content">
+        <section class="container">
+            <h2>Support Tickets</h2>
+            <div id="ticket-locked" class="auth-required-screen" style="height:auto; padding:40px; background:var(--panel);">
+                <p>Login required for support.</p>
+                <button onclick="routeTo('dashboard')" class="btn-primary">Go to Dashboard</button>
+            </div>
+            
+            <div id="ticket-system" style="display:none;">
+                <div id="list-view">
+                    <div class="auth-card">
+                        <h3>Create New Ticket</h3>
+                        <form id="ticket-form">
+                            <input type="text" id="ticket-subject" placeholder="Issue Subject" required>
+                            <textarea id="ticket-msg" placeholder="Describe the bug..." rows="3" required></textarea>
+                            <button type="submit" class="btn-primary">Open Ticket</button>
+                        </form>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
+                        <h3>Active Threads</h3>
+                        <button onclick="fetchTickets()" class="btn-secondary">Refresh</button>
+                    </div>
+                    <div id="ticket-list"></div>
+                </div>
 
-// --- IMGBB UPLOAD ---
-async function handleImageUpload(file, type) {
-    const statusEl = type === 'pfp' ? document.getElementById('upload-status') : document.getElementById('server-upload-status');
-    statusEl.style.display = 'block'; statusEl.innerText = "Uploading...";
+                <div id="thread-view" class="auth-card" style="display:none;">
+                    <button id="back-btn" class="btn-secondary" style="margin-bottom:15px;">&larr; Back</button>
+                    <h2 id="active-subject" style="margin:0 0 5px;"></h2>
+                    
+                    <div id="resolution-box" style="display:none; background:rgba(220, 20, 60, 0.1); border:1px solid var(--crimson); padding:10px; margin-bottom:15px;">
+                        <strong style="color:var(--crimson);">Resolution:</strong>
+                        <p id="resolution-text" style="margin-top:5px;"></p>
+                    </div>
 
-    const formData = new FormData();
-    formData.append("image", file);
-    try {
-        const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, { method: "POST", body: formData });
-        const data = await res.json();
-        const url = data.data.url;
+                    <div id="ticket-chat-box" style="height:300px; overflow-y:auto; display:flex; flex-direction:column; gap:10px; padding:10px; background:#000; margin-bottom:15px;"></div>
+                    
+                    <form id="ticket-chat-form" style="display:flex; gap:10px;">
+                        <input type="text" id="ticket-chat-input" placeholder="Message..." required style="margin:0;">
+                        <button type="submit" class="btn-primary">Send</button>
+                    </form>
 
-        if (type === 'pfp') {
-            document.getElementById('dashboard-pfp-preview').src = url;
-            document.getElementById('display-pfp').value = url;
-        } else {
-            await updateDoc(doc(db, "discord_servers", activeServerId), { photoURL: url });
-            document.getElementById('server-icon-preview').src = url;
-        }
-        statusEl.innerText = "Done!";
-    } catch (err) { statusEl.innerText = "Upload Failed."; }
-}
+                    <div id="admin-close-area" style="display:none; margin-top:15px; border-top:1px solid #333; padding-top:15px;">
+                        <textarea id="close-reason" placeholder="Resolution reason..." rows="2"></textarea>
+                        <button id="close-ticket-btn" class="btn-close-ticket">Finalize & Close Ticket</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
 
-// --- DISCOVERY & SERVER MANAGEMENT ---
-document.getElementById('add-server-btn').onclick = async () => {
-    const name = prompt("Server Name:");
-    if(name) {
-        const newS = await addDoc(collection(db, "discord_servers"), { name, owner: auth.currentUser.uid, members: [auth.currentUser.uid], admins: [auth.currentUser.uid], banned: [], timestamp: serverTimestamp() });
-        await addDoc(collection(db, "discord_servers", newS.id, "channels"), { name: "general", timestamp: serverTimestamp() });
-    }
-};
+    <main id="page-dashboard" class="page-content">
+        <section class="container">
+            <div class="auth-card" style="max-width: 500px; margin: auto;">
+                
+                <div id="login-container">
+                    <h2 id="auth-title" style="text-align:center;">Account Login</h2>
+                    <form id="login-form">
+                        <input type="email" id="email" placeholder="Email" required>
+                        <input type="password" id="password" placeholder="Password" required>
+                        <button type="submit" class="btn-primary" style="width:100%;">Connect</button>
+                    </form>
+                    <p style="text-align:center; margin-top:15px;">No account? <span id="toggle-auth" style="color:var(--crimson); cursor:pointer; font-weight:bold;">Register here</span></p>
+                </div>
+                
+                <div id="dashboard-container" style="display:none;">
+                    <h2 style="text-align:center;">User Dashboard</h2>
+                    <p style="text-align:center; color:#aaa; margin-top:0;">Logged in as: <strong id="user-display-email" style="color:white;"></strong></p>
+                    
+                    <div style="background:#000; padding:20px; border: 1px solid #333; margin: 20px 0; border-radius:8px; text-align:center;">
+                        
+                        <div id="pfp-drop-zone" class="safe-drop-zone" title="Drag & Drop an image here">
+                            <img id="dashboard-pfp-preview" src="" alt="PFP">
+                            <span class="drop-label">+ Upload</span>
+                            <input type="file" id="pfp-file-input" accept="image/*" style="display:none;">
+                        </div>
+                        <p style="font-size:0.8rem; color:#aaa; margin: 10px 0;">Drag an image onto the circle to set your avatar</p>
+                        <p id="upload-status" style="font-size:0.9rem; color:var(--crimson); margin:0; display:none; font-weight:bold;">Uploading...</p>
 
-document.getElementById('btn-discovery').onclick = async () => {
-    const discBox = document.getElementById('discovery-box');
-    discBox.style.display = 'flex';
-    document.getElementById('chat-box').style.display = 'none';
-    const snap = await getDocs(collection(db, "discord_servers"));
-    discBox.innerHTML = "";
-    snap.forEach(d => {
-        const data = d.data();
-        if(!data.members.includes(auth.currentUser.uid)) {
-            discBox.innerHTML += `<div class="discovery-card"><h3>${data.name}</h3><button class="btn-primary" onclick="joinServer('${d.id}')">Join</button></div>`;
-        }
-    });
-};
+                        <hr style="border:none; border-top:1px solid #333; margin: 20px 0;">
 
-// --- REMAINING DASHBOARD LOGIC ---
-document.getElementById('profile-form').onsubmit = async (e) => {
-    e.preventDefault();
-    await updateProfile(auth.currentUser, { displayName: document.getElementById('display-name').value, photoURL: document.getElementById('display-pfp').value });
-    alert("Saved!");
-};
+                        <form id="profile-form" style="text-align:left;">
+                            <label style="display:block; margin-bottom:5px; color:#aaa;">Display Name</label>
+                            <input type="text" id="display-name" placeholder="Enter your display name" required>
+                            <input type="hidden" id="display-pfp">
+                            <button type="submit" class="btn-primary" style="width:100%; margin-top:10px;">Save Profile Info</button>
+                        </form>
+                    </div>
 
-document.getElementById('login-form').onsubmit = (e) => {
-    e.preventDefault();
-    const email = document.getElementById('email').value, pass = document.getElementById('password').value;
-    signInWithEmailAndPassword(auth, email, pass).catch(() => createUserWithEmailAndPassword(auth, email, pass));
-};
+                    <div id="admin-panel" style="display:none; border-top: 1px solid #333; margin-top:20px; padding-top:20px;">
+                        <h3 style="color:var(--crimson); margin-top:0; text-align:center;">[ ADMIN CONSOLE ]</h3>
+                        <form id="news-form">
+                            <input type="text" id="news-title" placeholder="News Update Title" required>
+                            <textarea id="news-body" placeholder="Content (Markdown supported)..." rows="4" required></textarea>
+                            <button type="submit" class="btn-primary" style="width:100%;">Publish to Grid</button>
+                        </form>
+                    </div>
 
-// --- NEWS & TICKETS (Restored Logic) ---
-async function fetchNews() {
-    const snap = await getDocs(query(collection(db, "news"), orderBy("timestamp", "desc")));
-    const feed = document.getElementById('news-feed');
-    feed.innerHTML = "";
-    snap.forEach(d => feed.innerHTML += `<div class="news-card"><h3>${d.data().title}</h3><p>${d.data().body}</p></div>`);
-}
+                    <button id="logout-btn" class="btn-secondary" style="width:100%; margin-top:20px;">Disconnect Session</button>
+                </div>
 
-document.getElementById('pfp-drop-zone').onclick = () => document.getElementById('pfp-file-input').click();
-document.getElementById('pfp-file-input').onchange = (e) => handleImageUpload(e.target.files[0], 'pfp');
+            </div>
+        </section>
+    </main>
+
+    <div id="server-settings-modal" class="modal-overlay">
+        <div class="auth-card modal-content">
+            <h2 style="margin-top:0;">Server Settings</h2>
+            <div id="server-drop-zone" class="safe-drop-zone modal-drop-zone">
+                <img id="server-icon-preview" src="" style="display:none;">
+                <span class="drop-label">Drop Icon</span>
+                <input type="file" id="server-file-input" accept="image/*" style="display:none;">
+            </div>
+            <p id="server-upload-status" style="color:var(--crimson); font-size:0.9rem; display:none; font-weight:bold;">Uploading...</p>
+            <p style="font-size:0.8rem; color:#aaa;">Drag an image into the circle to update the server icon.</p>
+            <button class="btn-secondary" onclick="document.getElementById('server-settings-modal').style.display='none'" style="width:100%; margin-top:15px;">Close</button>
+        </div>
+    </div>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>
