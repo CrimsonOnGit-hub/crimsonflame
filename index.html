@@ -55,19 +55,19 @@
 
         <div id="chatter-system" class="chatter-layout" style="display:none;">
             <div class="server-sidebar">
-                <div class="server-icon server-discovery" id="btn-discovery" title="Discover Servers">🧭</div>
+                <div class="server-icon server-discovery" id="btn-discovery" title="Discover Servers" onclick="openDiscovery()">🧭</div>
                 <hr class="sidebar-divider">
                 <div id="server-list" class="server-list-container"></div>
                 <hr class="sidebar-divider">
-                <div class="server-icon server-add" id="add-server-btn" title="Create New Server">+</div>
+                <div class="server-icon server-add" id="add-server-btn" title="Create New Server" onclick="createServer()">+</div>
             </div>
 
             <div class="channel-sidebar">
                 <div class="channel-header">
                     <span id="active-server-name" class="truncate-text">No Server</span>
                     <div style="display:flex; gap:8px;">
-                        <button id="server-settings-btn" class="icon-btn" style="display:none;" title="Server Settings (Admin)">⚙️</button>
-                        <button id="add-channel-btn" class="icon-btn" style="display:none;" title="Add Channel (Admin)">+</button>
+                        <button id="server-settings-btn" class="icon-btn" style="display:none;" title="Server Settings (Admin)" onclick="openServerSettings()">⚙️</button>
+                        <button id="add-channel-btn" class="icon-btn" style="display:none;" title="Add Channel (Admin)" onclick="createChannel()">+</button>
                     </div>
                 </div>
                 <div class="channel-list" id="channel-list"></div>
@@ -76,7 +76,7 @@
             <div class="chat-area">
                 <div class="chat-header" id="active-channel-name">Select a server to connect</div>
                 <div class="messages-container" id="chat-box"></div>
-                <form class="chat-input-area" id="chat-form" style="display:none;">
+                <form class="chat-input-area" id="chat-form" style="display:none;" onsubmit="submitChat(event)">
                     <div class="chat-input-wrapper">
                         <input type="text" id="chat-input" placeholder="Message... (Use @Name or @everyone)" required autocomplete="off">
                         <button type="submit" class="btn-primary">Send</button>
@@ -99,7 +99,7 @@
                 <div id="list-view">
                     <div class="auth-card">
                         <h3>Create New Ticket</h3>
-                        <form id="ticket-form">
+                        <form id="ticket-form" onsubmit="submitTicket(event)">
                             <input type="text" id="ticket-subject" placeholder="Issue Subject" required>
                             <textarea id="ticket-msg" placeholder="Describe the bug..." rows="3" required></textarea>
                             <button type="submit" class="btn-primary">Open Ticket</button>
@@ -113,7 +113,7 @@
                 </div>
 
                 <div id="thread-view" class="auth-card" style="display:none;">
-                    <button id="back-btn" class="btn-secondary" style="margin-bottom:15px;">&larr; Back</button>
+                    <button id="back-btn" class="btn-secondary" style="margin-bottom:15px;" onclick="closeThreadView()">&larr; Back</button>
                     <h2 id="active-subject" style="margin:0 0 5px;"></h2>
                     
                     <div id="resolution-box" style="display:none; background:rgba(220, 20, 60, 0.1); border:1px solid var(--crimson); padding:10px; margin-bottom:15px;">
@@ -123,14 +123,14 @@
 
                     <div id="ticket-chat-box" style="height:300px; overflow-y:auto; display:flex; flex-direction:column; gap:10px; padding:10px; background:#000; margin-bottom:15px;"></div>
                     
-                    <form id="ticket-chat-form" style="display:flex; gap:10px;">
+                    <form id="ticket-chat-form" style="display:flex; gap:10px;" onsubmit="submitTicketChat(event)">
                         <input type="text" id="ticket-chat-input" placeholder="Message..." required style="margin:0;">
                         <button type="submit" class="btn-primary">Send</button>
                     </form>
 
                     <div id="admin-close-area" style="display:none; margin-top:15px; border-top:1px solid #333; padding-top:15px;">
                         <textarea id="close-reason" placeholder="Resolution reason..." rows="2"></textarea>
-                        <button id="close-ticket-btn" class="btn-close-ticket">Finalize & Close Ticket</button>
+                        <button id="close-ticket-btn" class="btn-close-ticket" onclick="closeActiveTicket()">Finalize & Close Ticket</button>
                     </div>
                 </div>
             </div>
@@ -143,12 +143,12 @@
                 
                 <div id="login-container">
                     <h2 id="auth-title" style="text-align:center;">Account Login</h2>
-                    <form id="login-form">
+                    <form id="login-form" onsubmit="submitLogin(event)">
                         <input type="email" id="email" placeholder="Email" required>
                         <input type="password" id="password" placeholder="Password" required>
                         <button type="submit" class="btn-primary" style="width:100%;">Connect</button>
                     </form>
-                    <p style="text-align:center; margin-top:15px;">No account? <span id="toggle-auth" style="color:var(--crimson); cursor:pointer; font-weight:bold;">Register here</span></p>
+                    <p style="text-align:center; margin-top:15px;">No account? <span id="toggle-auth" style="color:var(--crimson); cursor:pointer; font-weight:bold;" onclick="toggleLoginMode()">Register here</span></p>
                 </div>
                 
                 <div id="dashboard-container" style="display:none;">
@@ -167,7 +167,7 @@
 
                         <hr style="border:none; border-top:1px solid #333; margin: 20px 0;">
 
-                        <form id="profile-form" style="text-align:left;">
+                        <form id="profile-form" style="text-align:left;" onsubmit="submitProfile(event)">
                             <label style="display:block; margin-bottom:5px; color:#aaa;">Display Name</label>
                             <input type="text" id="display-name" placeholder="Enter your display name" required>
                             <input type="hidden" id="display-pfp">
@@ -177,14 +177,14 @@
 
                     <div id="admin-panel" style="display:none; border-top: 1px solid #333; margin-top:20px; padding-top:20px;">
                         <h3 style="color:var(--crimson); margin-top:0; text-align:center;">[ ADMIN CONSOLE ]</h3>
-                        <form id="news-form">
+                        <form id="news-form" onsubmit="submitNews(event)">
                             <input type="text" id="news-title" placeholder="News Update Title" required>
                             <textarea id="news-body" placeholder="Content (Markdown supported)..." rows="4" required></textarea>
                             <button type="submit" class="btn-primary" style="width:100%;">Publish to Grid</button>
                         </form>
                     </div>
 
-                    <button id="logout-btn" class="btn-secondary" style="width:100%; margin-top:20px;">Disconnect Session</button>
+                    <button id="logout-btn" class="btn-secondary" style="width:100%; margin-top:20px;" onclick="logOutUser()">Disconnect Session</button>
                 </div>
 
             </div>
