@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FireVerse Platform</title>
+    <title>CrimsonFlame Official</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
 
     <nav>
-        <div class="nav-logo">FireVerse</div>
+        <div class="nav-logo">CrimsonFlame</div>
         <div class="nav-links">
             <a href="#" onclick="routeTo('home')" style="color: var(--crimson);">Home</a>
             <a href="#" onclick="routeTo('updates')">Updates</a>
@@ -24,6 +24,24 @@
 
         <div id="page-home" class="page-content" style="display: block;">
             
+            <div class="card-container" style="max-width: 800px;">
+                <h2>Welcome to CrimsonFlame</h2>
+                <p>Explore our latest updates and media below.</p>
+                
+                <div id="home-gallery" style="display: flex; flex-direction: column; gap: 20px;">
+                    Loading media...
+                </div>
+
+                <div id="admin-home-editor" style="display: none; margin-top: 30px; padding: 20px; border: 2px dashed var(--crimson); border-radius: 8px; background: #1a1a1a;">
+                    <h3 style="color: var(--crimson); margin-top: 0;">Admin Tools: Publish to Homepage</h3>
+                    <div id="home-drop-zone" class="drop-zone" style="border-color: #555;">
+                        <span>Click or drop an image here to publish it live to the gallery</span>
+                        <input type="file" id="home-file-input" accept="image/*" style="display:none;">
+                    </div>
+                    <div id="home-upload-status" class="status-text"></div>
+                </div>
+            </div>
+
             <div id="login-container" class="card-container">
                 <h2 id="auth-title">Account Login</h2>
                 <form onsubmit="submitLogin(event)">
@@ -53,8 +71,7 @@
                 </form>
 
                 <div id="admin-panel" style="display: none; margin-top: 20px; padding: 15px; border: 1px solid var(--crimson);">
-                    <h3 style="color: var(--crimson);">Global Admin Panel</h3>
-                    <p>Post a news update:</p>
+                    <h3 style="color: var(--crimson);">Global Admin News Panel</h3>
                     <form id="news-form" onsubmit="submitNews(event)">
                         <input type="text" id="news-title" placeholder="Update Title" required>
                         <textarea id="news-body" placeholder="Update details (Markdown supported)" rows="4" required></textarea>
@@ -120,7 +137,6 @@
             </div>
 
             <div id="ticket-system" class="card-container" style="display: none; max-width: 800px;">
-                
                 <div id="list-view">
                     <h2>Support Center</h2>
                     <form id="ticket-form" onsubmit="submitTicket(event)" style="margin-bottom: 30px;">
