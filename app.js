@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence, updateProfile } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, getDoc, query, orderBy, where, doc, onSnapshot, updateDoc, serverTimestamp, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, getDoc, query, orderBy, where, doc, onSnapshot, updateDoc, serverTimestamp, arrayUnion, arrayRemove, setDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyBSSJKDrFJ1_qlliZqgw34CY2TSaKOxxxM",
@@ -23,6 +23,8 @@ setPersistence(auth, browserLocalPersistence);
 let activeServerId = null;
 let activeServerAdmins = []; 
 let activeChannelId = null;
+let activeChatType = 'server'; // Can be 'server' or 'dm'
+let activeDmId = null;
 let isGlobalAdmin = false; 
 
 let chatterServersUnsub = null;
@@ -80,16 +82,98 @@ window.submitNews = async function(e) {
     window.fetchNews();
 };
 
+window.hasPermission = async function(serverId, uid, requiredPermission) {
+    const serverSnap = await getDoc(doc(db, "discord_servers", serverId));
+    if(!serverSnap.exists()) return false;
+    const data = serverSnap.data();
+    
+    // Legacy / Owner Fallback
+    if(data.owner === uid || isGlobalAdmin) return true;
+    
+    // Check Role-based permissions
+    if (data.roles && data.member_roles) {
+        const userRoleId = data.member_roles[uid] || 'member_role';
+        const userRole = data.roles[userRoleId];
+        if (userRole && userRole.permissions.includes(requiredPermission)) {
+            return true;
+        }
+    } else if (requiredPermission === 'ban' && data.admins && data.admins.includes(uid)) {
+        // Fallback for older servers without roles
+        return true;
+    }
+    return false;
+};
+
 window.submitChat = async function(e) {
     e.preventDefault();
     const input = document.getElementById('chat-input');
-    if(!input.value.trim() || !activeServerId || !activeChannelId) return;
+    const text = input.value.trim();
+    if(!text) return;
 
-    await addDoc(collection(db, "discord_servers", activeServerId, "channels", activeChannelId, "messages"), {
-        text: input.value, senderUid: auth.currentUser.uid, senderEmail: auth.currentUser.email,
-        senderName: auth.currentUser.displayName || "", senderPfp: auth.currentUser.photoURL || "", timestamp: serverTimestamp()
-    });
+    // --- SLASH COMMAND INTERCEPTOR ---
+    if (text.startsWith('/ban ')) {
+        if (activeChatType !== 'server' || !activeServerId) {
+            alert("You must be in a server channel to ban a user.");
+            input.value = "";
+            return;
+        }
+
+        const targetName = text.substring(5).trim();
+        const canBan = await window.hasPermission(activeServerId, auth.currentUser.uid, 'ban');
+        
+        if (!canBan) {
+            alert("You don't have permission to ban users in this server.");
+            input.value = "";
+            return;
+        }
+
+        await window.executeBanByName(activeServerId, targetName);
+        input.value = "";
+        return;
+    }
+
+    // --- NORMAL MESSAGE SENDING ---
+    if (activeChatType === 'server' && activeServerId && activeChannelId) {
+        await addDoc(collection(db, "discord_servers", activeServerId, "channels", activeChannelId, "messages"), {
+            text: text, senderUid: auth.currentUser.uid, senderEmail: auth.currentUser.email,
+            senderName: auth.currentUser.displayName || "", senderPfp: auth.currentUser.photoURL || "", timestamp: serverTimestamp()
+        });
+    } else if (activeChatType === 'dm' && activeDmId) {
+        await addDoc(collection(db, "dms", activeDmId, "messages"), {
+            text: text, senderUid: auth.currentUser.uid, senderEmail: auth.currentUser.email,
+            senderName: auth.currentUser.displayName || "", senderPfp: auth.currentUser.photoURL || "", timestamp: serverTimestamp()
+        });
+    }
+    
     input.value = "";
+};
+
+window.executeBanByName = async function(serverId, targetName) {
+    // Look up user UID by searching recent messages (workaround since there's no global users collection)
+    const messagesQuery = query(collection(db, "discord_servers", serverId, "channels", activeChannelId, "messages"));
+    const snap = await getDocs(messagesQuery);
+    let targetUid = null;
+    
+    snap.forEach(doc => {
+        const data = doc.data();
+        const msgSenderName = data.senderName ? data.senderName.toLowerCase() : data.senderEmail.split('@')[0].toLowerCase();
+        if (msgSenderName === targetName.toLowerCase()) {
+            targetUid = data.senderUid;
+        }
+    });
+
+    if (!targetUid) {
+        alert(`Could not find a user named "${targetName}" in this channel's recent history.`);
+        return;
+    }
+
+    if (confirm(`Are you sure you want to ban ${targetName}?`)) {
+        await updateDoc(doc(db, "discord_servers", serverId), { 
+            members: arrayRemove(targetUid), 
+            banned: arrayUnion(targetUid) 
+        });
+        alert(`${targetName} has been banned.`);
+    }
 };
 
 window.submitTicket = async function(e) {
@@ -204,7 +288,14 @@ window.createServer = async function() {
     if(name) {
         try {
             const newServer = await addDoc(collection(db, "discord_servers"), { 
-                name: name, owner: auth.currentUser.uid, members: [auth.currentUser.uid], admins: [auth.currentUser.uid], banned: [], photoURL: "", timestamp: serverTimestamp() 
+                name: name, owner: auth.currentUser.uid, members: [auth.currentUser.uid], admins: [auth.currentUser.uid], banned: [], photoURL: "", timestamp: serverTimestamp(),
+                roles: {
+                    "admin_role": { name: "Admin", permissions: ["ban", "kick", "manage_channels"] },
+                    "member_role": { name: "Member", permissions: ["send_messages"] }
+                },
+                member_roles: {
+                    [auth.currentUser.uid]: "admin_role"
+                }
             });
             await addDoc(collection(db, "discord_servers", newServer.id, "channels"), { name: "general", timestamp: serverTimestamp() });
         } catch(err) { alert("Failed to create server. " + err.message); }
@@ -241,25 +332,73 @@ window.openServerSettings = async function() {
 
 window.joinServer = async function(serverId) {
     try {
-        await updateDoc(doc(db, "discord_servers", serverId), { members: arrayUnion(auth.currentUser.uid) });
+        await updateDoc(doc(db, "discord_servers", serverId), { 
+            members: arrayUnion(auth.currentUser.uid),
+            [`member_roles.${auth.currentUser.uid}`]: "member_role" 
+        });
         window.openDiscovery(); 
     } catch(err) { alert("Failed to join. " + err.message); }
 };
 
 window.promoteAdmin = async function(targetUid) {
     if(confirm("Make this user an Admin?")) {
-        await updateDoc(doc(db, "discord_servers", activeServerId), { admins: arrayUnion(targetUid) });
+        await updateDoc(doc(db, "discord_servers", activeServerId), { 
+            admins: arrayUnion(targetUid),
+            [`member_roles.${targetUid}`]: "admin_role"
+        });
         activeServerAdmins.push(targetUid); 
     }
 };
 
-window.banUser = async function(targetUid) {
-    if(confirm("Ban this user?")) {
-        await updateDoc(doc(db, "discord_servers", activeServerId), { members: arrayRemove(targetUid), banned: arrayUnion(targetUid) });
-    }
+// --- DIRECT MESSAGING ---
+window.openDM = async function(targetUid, targetName) {
+    if (!auth.currentUser || targetUid === auth.currentUser.uid) return;
+    
+    activeChatType = 'dm';
+    // Create a consistent document ID based on the two UIDs
+    const dmId = [auth.currentUser.uid, targetUid].sort().join('_');
+    activeDmId = dmId;
+
+    if(document.getElementById('active-server-name')) document.getElementById('active-server-name').innerText = "Direct Messages";
+    if(document.getElementById('active-channel-name')) document.getElementById('active-channel-name').innerText = `@ ${targetName}`;
+    if(document.getElementById('chat-form')) document.getElementById('chat-form').style.display = 'block';
+    
+    // Show DM in channel list area
+    document.querySelectorAll('.channel-item').forEach(el => el.classList.remove('active'));
+    document.getElementById('channel-list').innerHTML = `<div class="channel-item active" style="color:var(--crimson);">@ ${targetName}</div>`;
+
+    // Ensure DM document exists
+    await setDoc(doc(db, "dms", dmId), {
+        participants: [auth.currentUser.uid, targetUid]
+    }, { merge: true });
+
+    if(chatterMessagesUnsub) chatterMessagesUnsub();
+    const box = document.getElementById('chat-box');
+    if(!box) return;
+    box.innerHTML = "Loading DM...";
+
+    chatterMessagesUnsub = onSnapshot(query(collection(db, "dms", dmId, "messages"), orderBy("timestamp", "asc")), snap => {
+        box.innerHTML = "";
+        snap.forEach(mDoc => {
+            const m = mDoc.data();
+            const nameToUse = m.senderName || m.senderEmail.split('@')[0];
+            const pfpToUse = m.senderPfp || DEFAULT_PFP;
+            
+            box.innerHTML += `
+            <div class="msg">
+                <img src="${pfpToUse}" class="chat-pfp">
+                <div class="msg-content">
+                    <span class="msg-sender">${nameToUse}</span>
+                    <div class="msg-text">${m.text}</div>
+                </div>
+            </div>`;
+        });
+        box.scrollTop = box.scrollHeight;
+    });
 };
 
 window.selectChannel = function(channelId, channelName, element) {
+    activeChatType = 'server';
     activeChannelId = channelId;
     if(document.getElementById('active-channel-name')) document.getElementById('active-channel-name').innerText = `# ${channelName}`;
     if(document.getElementById('chat-form')) document.getElementById('chat-form').style.display = 'block';
@@ -290,14 +429,17 @@ window.selectChannel = function(channelId, channelName, element) {
             const pingClass = isPinged ? 'ping-highlight' : '';
             
             let actionHTML = '';
+            // Render Promote button if admin. (Ban button removed, use /ban instead)
             if(amIAdmin && m.senderUid !== auth.currentUser.uid) {
-                if (!activeServerAdmins.includes(m.senderUid)) actionHTML += `<button class="action-btn promote" onclick="promoteAdmin('${m.senderUid}')">👑 Promote</button>`;
-                actionHTML += `<button class="action-btn ban" onclick="banUser('${m.senderUid}')">🔨 Ban</button>`;
+                if (!activeServerAdmins.includes(m.senderUid)) {
+                    actionHTML += `<button class="action-btn promote" onclick="promoteAdmin('${m.senderUid}')">👑 Promote</button>`;
+                }
             }
 
+            // Added onclick to profile picture to open DMs
             box.innerHTML += `
                 <div class="msg">
-                    <img src="${pfpToUse}" class="chat-pfp">
+                    <img src="${pfpToUse}" class="chat-pfp" style="cursor:pointer;" onclick="openDM('${m.senderUid}', '${nameToUse.replace(/'/g, "\\'")}')" title="Click to message">
                     <div class="msg-content">
                         <span class="msg-sender">${nameToUse} <div style="display:flex; gap:5px;">${actionHTML}</div></span>
                         <div class="msg-text ${pingClass}">${formattedText}</div>
@@ -326,6 +468,7 @@ window.selectServer = function(serverId, serverData, element) {
     if(document.getElementById('chat-box')) document.getElementById('chat-box').style.display = 'flex';
     if(document.getElementById('discovery-box')) document.getElementById('discovery-box').style.display = 'none';
 
+    activeChatType = 'server';
     activeServerId = serverId;
     activeServerAdmins = serverData.admins || [serverData.owner];
     activeChannelId = null;
@@ -502,7 +645,6 @@ onAuthStateChanged(auth, user => {
     }
 });
 
-// --- DRAG AND DROP: IMGBB API ---
 const pfpDropZone = document.getElementById('pfp-drop-zone');
 const pfpFileInput = document.getElementById('pfp-file-input');
 if(pfpDropZone && pfpFileInput) {
@@ -539,7 +681,7 @@ async function handleImageUpload(file, type) {
 
     if(statusEl) {
         statusEl.style.display = 'block';
-        statusEl.innerText = "Uploading to ImgBB...";
+        statusEl.innerText = "Uploading...";
     }
 
     try {
@@ -553,7 +695,7 @@ async function handleImageUpload(file, type) {
 
         const data = await response.json();
         
-        if (!data.success) throw new Error("ImgBB API rejected the upload.");
+        if (!data.success) throw new Error("Error, unable to upload");
 
         const downloadURL = data.data.url;
 
@@ -572,7 +714,7 @@ async function handleImageUpload(file, type) {
         }
         setTimeout(() => { if(statusEl) statusEl.style.display = 'none'; }, 4000);
     } catch (error) {
-        if(statusEl) statusEl.innerText = "Upload Failed. Check console.";
+        if(statusEl) statusEl.innerText = "Upload Failed";
         console.error("IMGBB Error:", error);
     }
 }
