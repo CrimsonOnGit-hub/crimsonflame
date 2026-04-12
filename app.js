@@ -47,8 +47,34 @@ function triggerBrowserNotification(title, body) {
 }
 
 // ==========================================
-// --- GLOBAL WINDOW EXPORTS (BULLETPROOF) --
+// --- GLOBAL WINDOW EXPORTS ---
 // ==========================================
+
+// --- CORE DATA FETCHING ---
+window.fetchHomeImages = async function() {
+    const gallery = document.getElementById('home-gallery');
+    if(!gallery) return;
+    
+    try {
+        const snap = await getDocs(query(collection(db, "home_images"), orderBy("timestamp", "desc")));
+        gallery.innerHTML = "";
+        
+        if(snap.empty) { 
+            gallery.innerHTML = "<p style='color:#aaa;'>No media published yet.</p>"; 
+            return; 
+        }
+        
+        snap.forEach(doc => {
+            const data = doc.data();
+            gallery.innerHTML += `<img src="${data.url}" alt="Homepage Image">`;
+        });
+    } catch(err) {
+        gallery.innerHTML = `<p style="color:var(--crimson);">Error loading gallery.</p>`;
+    }
+};
+// Fetch immediately for visitors
+window.fetchHomeImages();
+
 
 // --- CORE FORMS ---
 window.submitLogin = function(e) {
@@ -87,18 +113,13 @@ window.hasPermission = async function(serverId, uid, requiredPermission) {
     if(!serverSnap.exists()) return false;
     const data = serverSnap.data();
     
-    // Legacy / Owner Fallback
     if(data.owner === uid || isGlobalAdmin) return true;
     
-    // Check Role-based permissions
     if (data.roles && data.member_roles) {
         const userRoleId = data.member_roles[uid] || 'member_role';
         const userRole = data.roles[userRoleId];
-        if (userRole && userRole.permissions.includes(requiredPermission)) {
-            return true;
-        }
+        if (userRole && userRole.permissions.includes(requiredPermission)) return true;
     } else if (requiredPermission === 'ban' && data.admins && data.admins.includes(uid)) {
-        // Fallback for older servers without roles
         return true;
     }
     return false;
@@ -110,7 +131,6 @@ window.submitChat = async function(e) {
     const text = input.value.trim();
     if(!text) return;
 
-    // --- SLASH COMMAND INTERCEPTOR ---
     if (text.startsWith('/ban ')) {
         if (activeChatType !== 'server' || !activeServerId) {
             alert("You must be in a server channel to ban a user.");
@@ -132,7 +152,6 @@ window.submitChat = async function(e) {
         return;
     }
 
-    // --- NORMAL MESSAGE SENDING ---
     if (activeChatType === 'server' && activeServerId && activeChannelId) {
         await addDoc(collection(db, "discord_servers", activeServerId, "channels", activeChannelId, "messages"), {
             text: text, senderUid: auth.currentUser.uid, senderEmail: auth.currentUser.email,
@@ -149,7 +168,6 @@ window.submitChat = async function(e) {
 };
 
 window.executeBanByName = async function(serverId, targetName) {
-    // Look up user UID by searching recent messages (workaround since there's no global users collection)
     const messagesQuery = query(collection(db, "discord_servers", serverId, "channels", activeChannelId, "messages"));
     const snap = await getDocs(messagesQuery);
     let targetUid = null;
@@ -157,9 +175,7 @@ window.executeBanByName = async function(serverId, targetName) {
     snap.forEach(doc => {
         const data = doc.data();
         const msgSenderName = data.senderName ? data.senderName.toLowerCase() : data.senderEmail.split('@')[0].toLowerCase();
-        if (msgSenderName === targetName.toLowerCase()) {
-            targetUid = data.senderUid;
-        }
+        if (msgSenderName === targetName.toLowerCase()) targetUid = data.senderUid;
     });
 
     if (!targetUid) {
@@ -192,7 +208,7 @@ window.submitTicketChat = async function(e) {
     input.value = "";
 };
 
-// --- BUTTONS ---
+// --- BUTTONS & ROUTING ---
 window.toggleLoginMode = function() {
     isLogin = !isLogin;
     document.getElementById('auth-title').innerText = isLogin ? "Account Login" : "Register Account";
@@ -227,11 +243,13 @@ window.routeTo = function(page) {
     const activeLink = document.querySelector(`nav a[onclick="routeTo('${page}')"]`);
     if(activeLink) activeLink.style.color = 'var(--crimson)';
 
+    if(page === 'home') window.fetchHomeImages();
     if(page === 'updates') window.fetchNews();
     if(page === 'chatter' && auth.currentUser) window.initChatter();
     if(page === 'tickets' && auth.currentUser) window.fetchTickets();
 };
 
+// --- CHATTER LOGIC ---
 window.openDiscovery = async function() {
     document.querySelectorAll('.server-icon').forEach(el => el.classList.remove('active'));
     const discBtn = document.getElementById('btn-discovery');
@@ -319,15 +337,12 @@ window.openServerSettings = async function() {
     try {
         const serverSnap = await getDoc(doc(db, "discord_servers", activeServerId));
         const url = serverSnap.data().photoURL || "";
-        
         const preview = document.getElementById('server-icon-preview');
         if(preview) {
             preview.src = url;
             preview.style.display = url ? 'block' : 'none';
         }
-    } catch(err) {
-        console.error("Error loading server settings:", err);
-    }
+    } catch(err) { console.error("Error loading server settings:", err); }
 };
 
 window.joinServer = async function(serverId) {
@@ -350,12 +365,10 @@ window.promoteAdmin = async function(targetUid) {
     }
 };
 
-// --- DIRECT MESSAGING ---
 window.openDM = async function(targetUid, targetName) {
     if (!auth.currentUser || targetUid === auth.currentUser.uid) return;
     
     activeChatType = 'dm';
-    // Create a consistent document ID based on the two UIDs
     const dmId = [auth.currentUser.uid, targetUid].sort().join('_');
     activeDmId = dmId;
 
@@ -363,14 +376,10 @@ window.openDM = async function(targetUid, targetName) {
     if(document.getElementById('active-channel-name')) document.getElementById('active-channel-name').innerText = `@ ${targetName}`;
     if(document.getElementById('chat-form')) document.getElementById('chat-form').style.display = 'block';
     
-    // Show DM in channel list area
     document.querySelectorAll('.channel-item').forEach(el => el.classList.remove('active'));
     document.getElementById('channel-list').innerHTML = `<div class="channel-item active" style="color:var(--crimson);">@ ${targetName}</div>`;
 
-    // Ensure DM document exists
-    await setDoc(doc(db, "dms", dmId), {
-        participants: [auth.currentUser.uid, targetUid]
-    }, { merge: true });
+    await setDoc(doc(db, "dms", dmId), { participants: [auth.currentUser.uid, targetUid] }, { merge: true });
 
     if(chatterMessagesUnsub) chatterMessagesUnsub();
     const box = document.getElementById('chat-box');
@@ -383,7 +392,6 @@ window.openDM = async function(targetUid, targetName) {
             const m = mDoc.data();
             const nameToUse = m.senderName || m.senderEmail.split('@')[0];
             const pfpToUse = m.senderPfp || DEFAULT_PFP;
-            
             box.innerHTML += `
             <div class="msg">
                 <img src="${pfpToUse}" class="chat-pfp">
@@ -429,14 +437,12 @@ window.selectChannel = function(channelId, channelName, element) {
             const pingClass = isPinged ? 'ping-highlight' : '';
             
             let actionHTML = '';
-            // Render Promote button if admin. (Ban button removed, use /ban instead)
             if(amIAdmin && m.senderUid !== auth.currentUser.uid) {
                 if (!activeServerAdmins.includes(m.senderUid)) {
                     actionHTML += `<button class="action-btn promote" onclick="promoteAdmin('${m.senderUid}')">👑 Promote</button>`;
                 }
             }
 
-            // Added onclick to profile picture to open DMs
             box.innerHTML += `
                 <div class="msg">
                     <img src="${pfpToUse}" class="chat-pfp" style="cursor:pointer;" onclick="openDM('${m.senderUid}', '${nameToUse.replace(/'/g, "\\'")}')" title="Click to message">
@@ -514,9 +520,7 @@ window.fetchNews = async function() {
             const data = d.data();
             feed.innerHTML += `<div class="news-card"><small style="color:var(--crimson);">${data.date}</small><h3 style="margin:5px 0;">${data.title}</h3><div>${marked.parse(data.body)}</div></div>`;
         });
-    } catch(e) {
-        feed.innerHTML = `<p style="color:var(--crimson);">Error fetching updates: ${e.message}</p>`;
-    }
+    } catch(e) { feed.innerHTML = `<p style="color:var(--crimson);">Error fetching updates: ${e.message}</p>`; }
 };
 
 window.initChatter = function() {
@@ -534,11 +538,8 @@ window.initChatter = function() {
             el.className = `server-icon ${activeServerId === docSnap.id ? 'active' : ''}`;
             el.title = data.name;
             
-            if(data.photoURL) {
-                el.innerHTML = `<img src="${data.photoURL}">`;
-            } else {
-                el.innerText = data.name.substring(0,2).toUpperCase();
-            }
+            if(data.photoURL) { el.innerHTML = `<img src="${data.photoURL}">`; } 
+            else { el.innerText = data.name.substring(0,2).toUpperCase(); }
             
             el.onclick = (e) => { e.preventDefault(); window.selectServer(docSnap.id, data, el); };
             serverList.appendChild(el);
@@ -552,7 +553,6 @@ window.fetchTickets = async function() {
     if(!list) return;
 
     list.innerHTML = "Syncing Grid...";
-    
     let q = query(collection(db, "tickets"), orderBy("timestamp", "desc"));
     if(!isGlobalAdmin) q = query(collection(db, "tickets"), where("userId", "==", auth.currentUser.uid), orderBy("timestamp", "desc"));
     
@@ -571,8 +571,7 @@ window.fetchTickets = async function() {
             list.appendChild(item);
         });
     } catch(err) { 
-        list.innerHTML = `<p style="color:var(--crimson);">Error fetching tickets. Check Firebase Index rules.</p>`;
-        console.error(err); 
+        list.innerHTML = `<p style="color:var(--crimson);">Error fetching tickets.</p>`;
     }
 };
 
@@ -633,6 +632,12 @@ onAuthStateChanged(auth, user => {
         if(document.getElementById('dashboard-pfp-preview')) document.getElementById('dashboard-pfp-preview').src = user.photoURL || DEFAULT_PFP;
 
         if(document.getElementById('admin-panel')) document.getElementById('admin-panel').style.display = isGlobalAdmin ? 'block' : 'none';
+        
+        // UNHIDE HOMEPAGE EDITOR ONLY FOR ADMIN
+        if(document.getElementById('admin-home-editor')) {
+            document.getElementById('admin-home-editor').style.display = isGlobalAdmin ? 'block' : 'none';
+        }
+
     } else {
         isGlobalAdmin = false;
         if(navAuth) navAuth.innerText = "Login";
@@ -642,9 +647,13 @@ onAuthStateChanged(auth, user => {
         if(document.getElementById('ticket-system')) document.getElementById('ticket-system').style.display = 'none';
         if(document.getElementById('chatter-locked')) document.getElementById('chatter-locked').style.display = 'flex';
         if(document.getElementById('chatter-system')) document.getElementById('chatter-system').style.display = 'none';
+        
+        // HIDE HOMEPAGE EDITOR FOR GUESTS
+        if(document.getElementById('admin-home-editor')) document.getElementById('admin-home-editor').style.display = 'none';
     }
 });
 
+// --- IMAGE UPLOAD LOGIC ---
 const pfpDropZone = document.getElementById('pfp-drop-zone');
 const pfpFileInput = document.getElementById('pfp-file-input');
 if(pfpDropZone && pfpFileInput) {
@@ -665,8 +674,26 @@ if(serverDropZone && serverFileInput) {
     serverDropZone.addEventListener('drop', (e) => { e.preventDefault(); serverDropZone.classList.remove('dragover'); if (e.dataTransfer.files.length) handleImageUpload(e.dataTransfer.files[0], 'server'); });
 }
 
+const homeDropZone = document.getElementById('home-drop-zone');
+const homeFileInput = document.getElementById('home-file-input');
+if(homeDropZone && homeFileInput) {
+    homeDropZone.addEventListener('click', () => homeFileInput.click());
+    homeFileInput.addEventListener('change', (e) => handleImageUpload(e.target.files[0], 'home'));
+    homeDropZone.addEventListener('dragover', (e) => { e.preventDefault(); homeDropZone.classList.add('dragover'); });
+    homeDropZone.addEventListener('dragleave', () => homeDropZone.classList.remove('dragover'));
+    homeDropZone.addEventListener('drop', (e) => { e.preventDefault(); homeDropZone.classList.remove('dragover'); if (e.dataTransfer.files.length) handleImageUpload(e.dataTransfer.files[0], 'home'); });
+}
+
 async function handleImageUpload(file, type) {
     if (!file || !file.type.startsWith('image/')) return alert("Please upload a valid image file.");
+
+    // EXPLICIT SECURITY CHECK BEFORE ALLOWING HOME UPLOAD
+    if (type === 'home') {
+        if (!auth.currentUser || auth.currentUser.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+            alert("Security Block: Only the Global Admin can modify the homepage.");
+            return;
+        }
+    }
 
     let statusEl, previewEl;
     
@@ -677,11 +704,13 @@ async function handleImageUpload(file, type) {
         if(!activeServerId) return;
         statusEl = document.getElementById('server-upload-status');
         previewEl = document.getElementById('server-icon-preview');
+    } else if (type === 'home') {
+        statusEl = document.getElementById('home-upload-status');
     }
 
     if(statusEl) {
         statusEl.style.display = 'block';
-        statusEl.innerText = "Uploading...";
+        statusEl.innerText = "Uploading to server...";
     }
 
     try {
@@ -711,7 +740,15 @@ async function handleImageUpload(file, type) {
         } else if (type === 'server') {
             await updateDoc(doc(db, "discord_servers", activeServerId), { photoURL: downloadURL });
             if(statusEl) statusEl.innerText = "Server Icon Updated!";
+        } else if (type === 'home') {
+            await addDoc(collection(db, "home_images"), { 
+                url: downloadURL, 
+                timestamp: serverTimestamp() 
+            });
+            if(statusEl) statusEl.innerText = "Published to Homepage!";
+            window.fetchHomeImages(); 
         }
+        
         setTimeout(() => { if(statusEl) statusEl.style.display = 'none'; }, 4000);
     } catch (error) {
         if(statusEl) statusEl.innerText = "Upload Failed";
