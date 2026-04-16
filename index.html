@@ -16,6 +16,7 @@
             <a href="#" onclick="routeTo('updates')">Updates</a>
             <a href="#" onclick="routeTo('chatter')">Chatter</a>
             <a href="#" onclick="routeTo('tickets')">Support</a>
+            <a href="#" onclick="routeTo('terms')">Terms</a>
             <a href="#" onclick="routeTo('home')" id="nav-auth-link">Login</a>
         </div>
     </nav>
@@ -88,6 +89,13 @@
             </div>
         </div>
 
+        <div id="page-terms" class="page-content">
+            <div class="card-container" style="max-width: 800px;">
+                <h2>Terms of Service</h2>
+                <div id="terms-content">Loading terms...</div>
+            </div>
+        </div>
+
         <div id="page-chatter" class="page-content full-height">
             <div id="chatter-locked" class="card-container">
                 <h2>Chatter Access Locked</h2>
@@ -116,13 +124,10 @@
                     <div class="chat-header">
                         <h3 id="active-channel-name">Discover Public Servers</h3>
                     </div>
-                    
                     <div class="chat-content">
                         <div id="discovery-box" class="discovery-grid"></div>
-                        
                         <div id="chat-box" class="messages-container" style="display:none;"></div>
                     </div>
-
                     <form id="chat-form" class="chat-input-area" style="display:none;" onsubmit="submitChat(event)">
                         <input type="text" id="chat-input" placeholder="Message this channel... (Use /ban <name> to ban)">
                     </form>
@@ -151,19 +156,15 @@
                 <div id="thread-view" style="display: none;">
                     <button class="btn-secondary" onclick="closeThreadView()">← Back to List</button>
                     <h2 id="active-subject">Ticket Subject</h2>
-                    
                     <div id="ticket-chat-box" class="messages-container" style="height: 300px; background: #1a1a1a; margin-bottom: 10px;"></div>
-                    
                     <form id="ticket-chat-form" onsubmit="submitTicketChat(event)" style="display: flex; gap: 10px;">
                         <input type="text" id="ticket-chat-input" placeholder="Type a reply..." style="flex: 1;" required>
                         <button type="submit" class="btn-primary">Reply</button>
                     </form>
-
                     <div id="admin-close-area" style="display: none; margin-top: 20px; padding-top: 20px; border-top: 1px solid #444;">
                         <input type="text" id="close-reason" placeholder="Resolution / Close Reason">
                         <button class="btn-danger" onclick="closeActiveTicket()">Close Ticket</button>
                     </div>
-
                     <div id="resolution-box" style="display: none; margin-top: 20px; padding: 15px; background: #2a2a2a; border-left: 4px solid var(--crimson);">
                         <strong>Ticket Closed:</strong> <span id="resolution-text"></span>
                     </div>
