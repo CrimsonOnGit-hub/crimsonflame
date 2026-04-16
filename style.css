@@ -20,7 +20,6 @@ body {
     color: var(--text-main);
 }
 
-/* --- NAVIGATION --- */
 nav {
     display: flex;
     justify-content: space-between;
@@ -48,14 +47,13 @@ nav {
     color: var(--crimson);
 }
 
-/* --- LAYOUT UTILITIES --- */
 main {
-    height: calc(100vh - 65px); /* Subtract nav height */
+    height: calc(100vh - 65px); 
     overflow-y: auto;
 }
 
 .page-content {
-    display: none; /* Handled by JS */
+    display: none; 
     padding: 20px;
 }
 
@@ -73,7 +71,10 @@ main {
     box-shadow: 0 4px 10px rgba(0,0,0,0.5);
 }
 
-/* --- FORMS & BUTTONS --- */
+#page-updates .card-container, #page-home .card-container, #page-terms .card-container {
+    max-width: 800px;
+}
+
 input[type="text"], input[type="email"], input[type="password"], textarea {
     width: 100%;
     padding: 12px;
@@ -127,7 +128,6 @@ a {
     color: var(--crimson);
 }
 
-/* --- DRAG & DROP ZONES --- */
 .drop-zone {
     border: 2px dashed #666;
     padding: 20px;
@@ -158,7 +158,6 @@ a {
     margin-bottom: 10px;
 }
 
-/* --- FEED & TICKETS --- */
 .news-card, .auth-card {
     background-color: #2a2a2a;
     padding: 15px;
@@ -167,13 +166,21 @@ a {
     border-left: 4px solid var(--crimson);
 }
 
-/* --- CHATTER SYSTEM LAYOUT --- */
+#home-gallery img {
+    width: 100%;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+    transition: transform 0.2s;
+}
+#home-gallery img:hover {
+    transform: scale(1.02);
+}
+
 .chatter-layout {
     display: flex;
     height: 100%;
 }
 
-/* Left Sidebar (Server Icons) */
 .server-sidebar {
     width: 80px;
     background-color: #202225;
@@ -214,7 +221,6 @@ a {
 .discovery-btn { background-color: #2d3e50; }
 .add-server-btn { color: #43b581; font-size: 1.5rem; background-color: #36393f; }
 
-/* Middle Sidebar (Channels) */
 .channel-sidebar {
     width: 240px;
     background-color: #2f3136;
@@ -262,7 +268,6 @@ a {
     color: white;
 }
 
-/* Main Chat Area */
 .chat-main {
     flex: 1;
     background-color: #36393f;
@@ -279,7 +284,7 @@ a {
 
 .chat-content {
     flex: 1;
-    overflow-y: hidden; /* Prevent body scroll, handle inside containers */
+    overflow-y: hidden;
     position: relative;
 }
 
@@ -338,7 +343,6 @@ a {
     width: auto;
 }
 
-/* Chat Input Bar */
 .chat-input-area {
     padding: 20px;
 }
@@ -350,7 +354,6 @@ a {
     border-radius: 8px;
 }
 
-/* Discovery Grid */
 .discovery-grid {
     padding: 30px;
     display: flex;
@@ -377,7 +380,6 @@ a {
     margin-bottom: 10px;
 }
 
-/* Modals */
 .modal-overlay {
     position: fixed;
     top: 0; left: 0; width: 100%; height: 100%;
