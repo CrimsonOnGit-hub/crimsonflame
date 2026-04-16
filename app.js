@@ -90,7 +90,7 @@ window.fetchTerms = async function() {
 };
 
 // --- TERMS OF SERVICE FETCHING ---
-window.fetchTerms = async function() {
+window.fetchPrivacy = async function() {
     const privacyBox = document.getElementById('privacy-content');
     if(!privacyBox) return;
     
