@@ -23,7 +23,7 @@ setPersistence(auth, browserLocalPersistence);
 let activeServerId = null;
 let activeServerAdmins = []; 
 let activeChannelId = null;
-let activeChatType = 'server'; // Can be 'server' or 'dm'
+let activeChatType = 'server'; 
 let activeDmId = null;
 let isGlobalAdmin = false; 
 
@@ -72,8 +72,22 @@ window.fetchHomeImages = async function() {
         gallery.innerHTML = `<p style="color:var(--crimson);">Error loading gallery.</p>`;
     }
 };
-// Fetch immediately for visitors
 window.fetchHomeImages();
+
+// --- TERMS OF SERVICE FETCHING ---
+window.fetchTerms = async function() {
+    const termsBox = document.getElementById('terms-content');
+    if(!termsBox) return;
+    
+    try {
+        const response = await fetch('terms.md');
+        if (!response.ok) throw new Error("File not found or could not be loaded.");
+        const text = await response.text();
+        termsBox.innerHTML = marked.parse(text);
+    } catch(e) {
+        termsBox.innerHTML = `<p style="color:var(--crimson);">Error loading terms: ${e.message}</p>`;
+    }
+};
 
 
 // --- CORE FORMS ---
@@ -245,6 +259,7 @@ window.routeTo = function(page) {
 
     if(page === 'home') window.fetchHomeImages();
     if(page === 'updates') window.fetchNews();
+    if(page === 'terms') window.fetchTerms();
     if(page === 'chatter' && auth.currentUser) window.initChatter();
     if(page === 'tickets' && auth.currentUser) window.fetchTickets();
 };
@@ -296,7 +311,7 @@ window.openDiscovery = async function() {
         }
     } catch(err) {
         console.error(err);
-        discBox.innerHTML = "<p style='color:var(--crimson); width:100%; text-align:center;'>Error loading discovery. Check console.</p>";
+        discBox.innerHTML = "<p style='color:var(--crimson); width:100%; text-align:center;'>Error loading discovery.</p>";
     }
 };
 
@@ -326,7 +341,7 @@ window.createChannel = async function() {
     if(name) {
         try {
             await addDoc(collection(db, "discord_servers", activeServerId, "channels"), { name: name.toLowerCase().replace(/\s+/g, '-'), timestamp: serverTimestamp() });
-        } catch(err) { alert("Failed to add channel. Error: " + err.message); }
+        } catch(err) { alert("Failed to add channel."); }
     }
 };
 
@@ -342,7 +357,7 @@ window.openServerSettings = async function() {
             preview.src = url;
             preview.style.display = url ? 'block' : 'none';
         }
-    } catch(err) { console.error("Error loading server settings:", err); }
+    } catch(err) { console.error("Error loading settings"); }
 };
 
 window.joinServer = async function(serverId) {
@@ -352,7 +367,7 @@ window.joinServer = async function(serverId) {
             [`member_roles.${auth.currentUser.uid}`]: "member_role" 
         });
         window.openDiscovery(); 
-    } catch(err) { alert("Failed to join. " + err.message); }
+    } catch(err) { alert("Failed to join."); }
 };
 
 window.promoteAdmin = async function(targetUid) {
@@ -520,7 +535,7 @@ window.fetchNews = async function() {
             const data = d.data();
             feed.innerHTML += `<div class="news-card"><small style="color:var(--crimson);">${data.date}</small><h3 style="margin:5px 0;">${data.title}</h3><div>${marked.parse(data.body)}</div></div>`;
         });
-    } catch(e) { feed.innerHTML = `<p style="color:var(--crimson);">Error fetching updates: ${e.message}</p>`; }
+    } catch(e) { feed.innerHTML = `<p style="color:var(--crimson);">Error fetching updates.</p>`; }
 };
 
 window.initChatter = function() {
@@ -632,12 +647,7 @@ onAuthStateChanged(auth, user => {
         if(document.getElementById('dashboard-pfp-preview')) document.getElementById('dashboard-pfp-preview').src = user.photoURL || DEFAULT_PFP;
 
         if(document.getElementById('admin-panel')) document.getElementById('admin-panel').style.display = isGlobalAdmin ? 'block' : 'none';
-        
-        // UNHIDE HOMEPAGE EDITOR ONLY FOR ADMIN
-        if(document.getElementById('admin-home-editor')) {
-            document.getElementById('admin-home-editor').style.display = isGlobalAdmin ? 'block' : 'none';
-        }
-
+        if(document.getElementById('admin-home-editor')) document.getElementById('admin-home-editor').style.display = isGlobalAdmin ? 'block' : 'none';
     } else {
         isGlobalAdmin = false;
         if(navAuth) navAuth.innerText = "Login";
@@ -648,7 +658,6 @@ onAuthStateChanged(auth, user => {
         if(document.getElementById('chatter-locked')) document.getElementById('chatter-locked').style.display = 'flex';
         if(document.getElementById('chatter-system')) document.getElementById('chatter-system').style.display = 'none';
         
-        // HIDE HOMEPAGE EDITOR FOR GUESTS
         if(document.getElementById('admin-home-editor')) document.getElementById('admin-home-editor').style.display = 'none';
     }
 });
@@ -687,7 +696,6 @@ if(homeDropZone && homeFileInput) {
 async function handleImageUpload(file, type) {
     if (!file || !file.type.startsWith('image/')) return alert("Please upload a valid image file.");
 
-    // EXPLICIT SECURITY CHECK BEFORE ALLOWING HOME UPLOAD
     if (type === 'home') {
         if (!auth.currentUser || auth.currentUser.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
             alert("Security Block: Only the Global Admin can modify the homepage.");
