@@ -274,6 +274,7 @@ window.routeTo = function(page) {
     if(page === 'home') window.fetchHomeImages();
     if(page === 'updates') window.fetchNews();
     if(page === 'terms') window.fetchTerms();
+    if(page === 'privacy') window.fetchPrivacy();
     if(page === 'chatter' && auth.currentUser) window.initChatter();
     if(page === 'tickets' && auth.currentUser) window.fetchTickets();
 };
