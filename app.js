@@ -89,6 +89,20 @@ window.fetchTerms = async function() {
     }
 };
 
+// --- TERMS OF SERVICE FETCHING ---
+window.fetchTerms = async function() {
+    const termsBox = document.getElementById('privacy-content');
+    if(!termsBox) return;
+    
+    try {
+        const response = await fetch('privacy.md');
+        if (!response.ok) throw new Error("File not found or could not be loaded.");
+        const text = await response.text();
+        termsBox.innerHTML = marked.parse(text);
+    } catch(e) {
+        termsBox.innerHTML = `<p style="color:var(--crimson);">Error loading privacy policy: ${e.message}</p>`;
+    }
+};
 
 // --- CORE FORMS ---
 window.submitLogin = function(e) {
