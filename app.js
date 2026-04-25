@@ -269,10 +269,10 @@ window.routeTo = function(page) {
     const blobMain = document.getElementById('blob-main');
     const blobTrail = document.getElementById('blob-trail');
 
+    // This pushes BOTH blobs to the new link. The CSS delay makes them pinch in the middle!
     if(activeLink && blobMain && blobTrail) {
         activeLink.style.color = 'var(--text-main)'; 
         
-        // Push BOTH blobs to the new location. The CSS delay makes them pinch in the middle!
         blobMain.style.width = `${activeLink.offsetWidth}px`; 
         blobMain.style.left = `${activeLink.offsetLeft}px`; 
         
