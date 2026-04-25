@@ -1,5 +1,5 @@
 :root {
-    /* Glassmorphism Variables */
+    /* Liquid Light Glassmorphism Variables */
     --glass-panel: rgba(25, 25, 30, 0.5);
     --glass-panel-light: rgba(255, 255, 255, 0.05);
     --glass-border: rgba(255, 255, 255, 0.08);
@@ -31,7 +31,7 @@ nav {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: rgba(10, 10, 12, 0.5); /* Slightly more transparent to see the image */
+    background: rgba(10, 10, 12, 0.5); 
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     padding: 15px 30px;
@@ -48,10 +48,16 @@ nav {
     text-shadow: 0 0 10px rgba(220, 20, 60, 0.3);
 }
 
+.nav-links {
+    display: flex;
+    align-items: center;
+}
+
 .nav-links a {
     color: var(--text-muted);
     text-decoration: none;
-    margin-left: 20px;
+    padding: 8px 16px;
+    margin-left: 5px;
     font-weight: 500;
     transition: color 0.3s, text-shadow 0.3s;
 }
@@ -59,6 +65,25 @@ nav {
 .nav-links a:hover {
     color: var(--text-main);
     text-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+}
+
+/* --- LIQUID LIGHT NAV BLOB --- */
+#liquid-nav-blob {
+    position: absolute;
+    height: 38px;
+    top: 50%;
+    transform: translateY(-50%);
+    left: 0;
+    width: 0; 
+    background: rgba(220, 20, 60, 0.3);
+    border: 1px solid rgba(220, 20, 60, 0.5);
+    border-radius: 12px;
+    z-index: -1; 
+    /* The magic math that makes it bouncy and liquid-like */
+    transition: all 0.5s cubic-bezier(0.5, -0.4, 0.2, 1.4); 
+    opacity: 0;
+    box-shadow: 0 0 15px rgba(220, 20, 60, 0.4);
+    pointer-events: none; 
 }
 
 /* --- LAYOUT UTILITIES --- */
@@ -225,7 +250,7 @@ a:hover { opacity: 0.8; }
     box-shadow: 0 12px 30px rgba(0,0,0,0.7);
 }
 
-/* --- CHATTER SYSTEM LAYOUT (GLASSMORPHISM) --- */
+/* --- CHATTER SYSTEM LAYOUT (LIQUID LIGHT) --- */
 .chatter-layout {
     display: flex;
     height: 100%;
@@ -234,7 +259,7 @@ a:hover { opacity: 0.8; }
 
 .server-sidebar {
     width: 80px;
-    background: rgba(10, 10, 12, 0.3); /* Let the bg.png bleed through */
+    background: rgba(10, 10, 12, 0.3); 
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border-right: 1px solid var(--glass-border);
@@ -249,7 +274,7 @@ a:hover { opacity: 0.8; }
     width: 50px;
     height: 50px;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.1); /* Clearer glass for icons */
+    background: rgba(255, 255, 255, 0.1); 
     border: 1px solid var(--glass-border);
     margin-bottom: 15px;
     display: flex;
