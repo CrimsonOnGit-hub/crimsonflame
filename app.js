@@ -257,7 +257,7 @@ window.closeActiveTicket = async function() {
     window.closeThreadView();
 };
 
-// --- ROUTING & LIQUID LIGHT BLOB (UPDATED FOR STRETCH EFFECT) ---
+// --- ROUTING & METABALL (GOOEY) LIQUID LIGHT BLOB ---
 window.routeTo = function(page) {
     document.querySelectorAll('.page-content').forEach(p => p.style.display = 'none');
     const target = document.getElementById('page-' + page);
@@ -266,47 +266,42 @@ window.routeTo = function(page) {
     document.querySelectorAll('.nav-links a').forEach(a => a.style.color = 'var(--text-muted)');
     
     const activeLink = document.querySelector(`.nav-links a[onclick="routeTo('${page}')"]`);
-    if(activeLink) {
+    const blob = document.getElementById('liquid-nav-blob');
+    const blobContainer = document.querySelector('.blob-container');
+
+    if(activeLink && blob && blobContainer) {
         activeLink.style.color = 'var(--text-main)'; 
         
-        const blob = document.getElementById('liquid-nav-blob');
-        if(blob) {
-            blob.style.opacity = '1';
-            
-            // If the blob has no width yet (first load), just snap it to place
-            if (blob.offsetWidth === 0) {
-                blob.style.left = `${activeLink.offsetLeft}px`;
-                blob.style.width = `${activeLink.offsetWidth}px`;
-            } else {
-                // Get current and target coordinates to create the liquid stretch effect
-                const currentLeft = blob.offsetLeft;
-                const currentWidth = blob.offsetWidth;
-                const targetLeft = activeLink.offsetLeft;
-                const targetWidth = activeLink.offsetWidth;
-                
-                if (targetLeft > currentLeft) {
-                    // Moving Right: Stretch the right side out first
-                    blob.style.width = `${(targetLeft + targetWidth) - currentLeft}px`;
-                    setTimeout(() => {
-                        // Then snap the left side over to catch up
-                        blob.style.left = `${targetLeft}px`;
-                        blob.style.width = `${targetWidth}px`;
-                    }, 150); // Matches the CSS transition speed
-                } else if (targetLeft < currentLeft) {
-                    // Moving Left: Stretch the left side out first
-                    const currentRight = currentLeft + currentWidth;
-                    blob.style.left = `${targetLeft}px`;
-                    blob.style.width = `${currentRight - targetLeft}px`;
-                    setTimeout(() => {
-                        // Then snap the right side in
-                        blob.style.width = `${targetWidth}px`;
-                    }, 150);
+        blob.style.opacity = '1';
+        
+        // If the blob is already somewhere, spawn a trail to create the pinch
+        if (blob.offsetWidth > 0) {
+            const trail = document.createElement('div');
+            trail.className = 'trail-blob';
+            trail.style.left = blob.style.left;
+            trail.style.width = blob.style.width;
+            blobContainer.appendChild(trail);
+
+            // Animate trail shrinking to 0
+            setTimeout(() => {
+                // Shrinks towards the new location
+                if (activeLink.offsetLeft > parseInt(trail.style.left)) {
+                    trail.style.left = `${parseInt(trail.style.left) + parseInt(trail.style.width)}px`;
                 }
-            }
+                trail.style.width = '0px';
+                trail.style.opacity = '0';
+            }, 10);
+
+            // Clean it up after the animation finishes
+            setTimeout(() => trail.remove(), 400);
         }
+
+        // Shoot the main blob over to the new link
+        blob.style.width = `${activeLink.offsetWidth}px`; 
+        blob.style.left = `${activeLink.offsetLeft}px`; 
     }
 
-    // Try-Catch block prevents a Firebase connection error in Chatter from breaking the rest of the site
+    // Try-Catch block prevents errors in one page from breaking the whole nav
     try {
         if(page === 'home') window.fetchHomeImages();
         if(page === 'updates') window.fetchNews();
