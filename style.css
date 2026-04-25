@@ -72,10 +72,10 @@ nav {
 .blob-container {
     position: absolute;
     top: 0; left: 0; right: 0; bottom: 0;
-    filter: url('#goo'); /* Links to the invisible SVG at the top of the HTML */
+    filter: url('#goo'); /* Links to the SVG */
     z-index: -1;
     pointer-events: none;
-    opacity: 0.5; /* Keeps the entire blob semi-transparent to maintain the Glass look */
+    /* REMOVED opacity here! SVG filters break if the parent has CSS opacity */
 }
 
 .nav-blob {
@@ -83,20 +83,21 @@ nav {
     height: 38px;
     top: 50%;
     transform: translateY(-50%);
-    background: rgb(220, 20, 60); /* Needs to be solid for the Goo filter to work */
+    /* Set to a darker crimson so it still looks glassy without CSS opacity */
+    background: rgba(180, 10, 40, 0.9); 
     border-radius: 20px;
     left: 0;
     width: 0;
 }
 
-/* The primary blob moves instantly */
+/* Primary blob moves instantly */
 #blob-main {
-    transition: all 0.4s cubic-bezier(0.4, 0.0, 0.2, 1);
+    transition: left 0.4s cubic-bezier(0.4, 0.0, 0.2, 1), width 0.4s cubic-bezier(0.4, 0.0, 0.2, 1);
 }
 
-/* The trail blob lingers behind, creating the stretch pinch */
+/* Trail blob lingers 0.08s behind, creating the stretch/pinch effect */
 #blob-trail {
-    transition: all 0.4s cubic-bezier(0.4, 0.0, 0.2, 1) 0.1s; 
+    transition: left 0.4s cubic-bezier(0.4, 0.0, 0.2, 1) 0.08s, width 0.4s cubic-bezier(0.4, 0.0, 0.2, 1) 0.08s; 
 }
 
 
