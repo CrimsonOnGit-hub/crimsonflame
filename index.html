@@ -11,13 +11,15 @@
 
     <nav>
         <div class="nav-logo">CrimsonFlame</div>
-        <div class="nav-links">
-            <a href="#" onclick="routeTo('home')" style="color: var(--crimson);">Home</a>
+        <div class="nav-links" style="position: relative; z-index: 1;">
+            <div id="liquid-nav-blob"></div> 
+            
+            <a href="#" onclick="routeTo('home')">Home</a>
             <a href="#" onclick="routeTo('updates')">Updates</a>
             <a href="#" onclick="routeTo('chatter')">Chatter</a>
             <a href="#" onclick="routeTo('tickets')">Support</a>
             <a href="#" onclick="routeTo('terms')">Terms</a>
-            <a href="#" onclick="routeTo('privacy')">Privacy Policy</a>
+            <a href="#" onclick="routeTo('privacy')">Privacy</a>
             <a href="#" onclick="routeTo('home')" id="nav-auth-link">Login</a>
         </div>
     </nav>
@@ -34,7 +36,7 @@
                     Loading media...
                 </div>
 
-                <div id="admin-home-editor" style="display: none; margin-top: 30px; padding: 20px; border: 2px dashed var(--crimson); border-radius: 8px; background: #1a1a1a;">
+                <div id="admin-home-editor" style="display: none; margin-top: 30px; padding: 20px; border: 2px dashed var(--crimson); border-radius: 8px; background: rgba(0,0,0,0.4);">
                     <h3 style="color: var(--crimson); margin-top: 0;">Admin Tools: Publish to Homepage</h3>
                     <div id="home-drop-zone" class="drop-zone" style="border-color: #555;">
                         <span>Click or drop an image here to publish it live to the gallery</span>
@@ -58,7 +60,7 @@
                 <h2>Welcome to your Dashboard</h2>
                 <p>Logged in as: <strong id="user-display-email"></strong></p>
                 <button class="btn-danger" onclick="logOutUser()">Logout</button>
-                <hr>
+                <hr style="border-color: var(--glass-border); margin: 20px 0;">
                 
                 <h3>Profile Settings</h3>
                 <form onsubmit="submitProfile(event)">
@@ -72,7 +74,7 @@
                     <button type="submit" class="btn-primary">Save Profile Info</button>
                 </form>
 
-                <div id="admin-panel" style="display: none; margin-top: 20px; padding: 15px; border: 1px solid var(--crimson);">
+                <div id="admin-panel" style="display: none; margin-top: 20px; padding: 15px; border: 1px solid var(--crimson); border-radius: 8px; background: rgba(0,0,0,0.3);">
                     <h3 style="color: var(--crimson);">Global Admin News Panel</h3>
                     <form id="news-form" onsubmit="submitNews(event)">
                         <input type="text" id="news-title" placeholder="Update Title" required>
@@ -96,11 +98,11 @@
                 <div id="terms-content">Loading terms...</div>
             </div>
         </div>
-        
+
         <div id="page-privacy" class="page-content">
             <div class="card-container" style="max-width: 800px;">
                 <h2>Privacy Policy</h2>
-                <div id="privacy-content">Loading Privacy Policy...</div>
+                <div id="privacy-content">Loading privacy policy...</div>
             </div>
         </div>
 
@@ -114,7 +116,7 @@
             <div id="chatter-system" class="chatter-layout" style="display: none;">
                 <div class="server-sidebar">
                     <div class="server-icon discovery-btn" id="btn-discovery" onclick="openDiscovery()" title="Discover Servers">🌍</div>
-                    <hr style="width: 50%; border-color: #444;">
+                    <hr style="width: 50%; border-color: var(--glass-border); margin: 10px 0;">
                     <div id="server-list"></div>
                     <div class="server-icon add-server-btn" onclick="createServer()" title="Create Server">+</div>
                 </div>
@@ -157,23 +159,23 @@
                         <textarea id="ticket-msg" placeholder="Describe the issue in detail..." rows="4" required></textarea>
                         <button type="submit" class="btn-primary">Create Ticket</button>
                     </form>
-                    <h3>Your Tickets</h3>
+                    <h3 style="margin-top: 30px;">Your Tickets</h3>
                     <div id="ticket-list"></div>
                 </div>
 
                 <div id="thread-view" style="display: none;">
                     <button class="btn-secondary" onclick="closeThreadView()">← Back to List</button>
                     <h2 id="active-subject">Ticket Subject</h2>
-                    <div id="ticket-chat-box" class="messages-container" style="height: 300px; background: #1a1a1a; margin-bottom: 10px;"></div>
+                    <div id="ticket-chat-box" class="messages-container" style="height: 300px; background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border); border-radius: 8px; margin-bottom: 10px;"></div>
                     <form id="ticket-chat-form" onsubmit="submitTicketChat(event)" style="display: flex; gap: 10px;">
-                        <input type="text" id="ticket-chat-input" placeholder="Type a reply..." style="flex: 1;" required>
-                        <button type="submit" class="btn-primary">Reply</button>
+                        <input type="text" id="ticket-chat-input" placeholder="Type a reply..." style="flex: 1; margin-bottom: 0;" required>
+                        <button type="submit" class="btn-primary" style="width: auto;">Reply</button>
                     </form>
-                    <div id="admin-close-area" style="display: none; margin-top: 20px; padding-top: 20px; border-top: 1px solid #444;">
+                    <div id="admin-close-area" style="display: none; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--glass-border);">
                         <input type="text" id="close-reason" placeholder="Resolution / Close Reason">
-                        <button class="btn-danger" onclick="closeActiveTicket()">Close Ticket</button>
+                        <button class="btn-danger" style="width: 100%;" onclick="closeActiveTicket()">Close Ticket</button>
                     </div>
-                    <div id="resolution-box" style="display: none; margin-top: 20px; padding: 15px; background: #2a2a2a; border-left: 4px solid var(--crimson);">
+                    <div id="resolution-box" style="display: none; margin-top: 20px; padding: 15px; background: rgba(0,0,0,0.3); border-radius: 8px; border-left: 4px solid var(--crimson);">
                         <strong>Ticket Closed:</strong> <span id="resolution-text"></span>
                     </div>
                 </div>
@@ -182,7 +184,7 @@
     </main>
 
     <div id="server-settings-modal" class="modal-overlay" style="display: none;">
-        <div class="modal-content card-container">
+        <div class="modal-content card-container" style="margin: auto;">
             <h2>Server Settings</h2>
             <div id="server-drop-zone" class="drop-zone">
                 <img id="server-icon-preview" src="" alt="Server Icon" style="display:none; border-radius: 10px;">
@@ -190,7 +192,7 @@
                 <input type="file" id="server-file-input" accept="image/*" style="display:none;">
             </div>
             <div id="server-upload-status" class="status-text"></div>
-            <button class="btn-secondary" style="margin-top: 15px;" onclick="document.getElementById('server-settings-modal').style.display='none'">Close</button>
+            <button class="btn-secondary" style="margin-top: 15px; width: 100%;" onclick="document.getElementById('server-settings-modal').style.display='none'">Close</button>
         </div>
     </div>
 
