@@ -257,38 +257,66 @@ window.closeActiveTicket = async function() {
     window.closeThreadView();
 };
 
-// --- ROUTING & LIQUID LIGHT BLOB ---
+// --- ROUTING & LIQUID LIGHT BLOB (UPDATED FOR STRETCH EFFECT) ---
 window.routeTo = function(page) {
-    // Hide all pages and show the target page
     document.querySelectorAll('.page-content').forEach(p => p.style.display = 'none');
     const target = document.getElementById('page-' + page);
     if(target) target.style.display = 'block';
     
-    // Reset all text colors to muted
     document.querySelectorAll('.nav-links a').forEach(a => a.style.color = 'var(--text-muted)');
     
-    // Find the clicked link
     const activeLink = document.querySelector(`.nav-links a[onclick="routeTo('${page}')"]`);
     if(activeLink) {
-        // Highlight text white so it pops
         activeLink.style.color = 'var(--text-main)'; 
         
-        // Move the Liquid Light blob
         const blob = document.getElementById('liquid-nav-blob');
         if(blob) {
             blob.style.opacity = '1';
-            blob.style.width = `${activeLink.offsetWidth}px`; 
-            blob.style.left = `${activeLink.offsetLeft}px`; 
+            
+            // If the blob has no width yet (first load), just snap it to place
+            if (blob.offsetWidth === 0) {
+                blob.style.left = `${activeLink.offsetLeft}px`;
+                blob.style.width = `${activeLink.offsetWidth}px`;
+            } else {
+                // Get current and target coordinates to create the liquid stretch effect
+                const currentLeft = blob.offsetLeft;
+                const currentWidth = blob.offsetWidth;
+                const targetLeft = activeLink.offsetLeft;
+                const targetWidth = activeLink.offsetWidth;
+                
+                if (targetLeft > currentLeft) {
+                    // Moving Right: Stretch the right side out first
+                    blob.style.width = `${(targetLeft + targetWidth) - currentLeft}px`;
+                    setTimeout(() => {
+                        // Then snap the left side over to catch up
+                        blob.style.left = `${targetLeft}px`;
+                        blob.style.width = `${targetWidth}px`;
+                    }, 150); // Matches the CSS transition speed
+                } else if (targetLeft < currentLeft) {
+                    // Moving Left: Stretch the left side out first
+                    const currentRight = currentLeft + currentWidth;
+                    blob.style.left = `${targetLeft}px`;
+                    blob.style.width = `${currentRight - targetLeft}px`;
+                    setTimeout(() => {
+                        // Then snap the right side in
+                        blob.style.width = `${targetWidth}px`;
+                    }, 150);
+                }
+            }
         }
     }
 
-    // Trigger page-specific data fetching
-    if(page === 'home') window.fetchHomeImages();
-    if(page === 'updates') window.fetchNews();
-    if(page === 'terms') window.fetchTerms();
-    if(page === 'privacy') window.fetchPrivacy();
-    if(page === 'chatter' && auth.currentUser) window.initChatter();
-    if(page === 'tickets' && auth.currentUser) window.fetchTickets();
+    // Try-Catch block prevents a Firebase connection error in Chatter from breaking the rest of the site
+    try {
+        if(page === 'home') window.fetchHomeImages();
+        if(page === 'updates') window.fetchNews();
+        if(page === 'terms') window.fetchTerms();
+        if(page === 'privacy') window.fetchPrivacy();
+        if(page === 'chatter' && auth.currentUser) window.initChatter();
+        if(page === 'tickets' && auth.currentUser) window.fetchTickets();
+    } catch (err) {
+        console.error("Error loading page data:", err);
+    }
 };
 
 // --- CHATTER LOGIC ---
