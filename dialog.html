@@ -6,7 +6,17 @@
     <title>Dialog | CrimsonFlame</title>
     <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body style="overflow: hidden;">
+
+    <svg width="0" height="0" style="position: absolute; pointer-events: none;" xmlns="http://www.w3.org/2000/svg" version="1.1">
+        <defs>
+            <filter id="goo">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur" />
+                <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 19 -9" result="goo" />
+                <feComposite in="SourceGraphic" in2="goo" operator="atop"/>
+            </filter>
+        </defs>
+    </svg>
 
     <nav>
         <div class="nav-logo">CrimsonFlame <span style="color:var(--text-muted); font-size:1rem;">| Dialog</span></div>
@@ -15,41 +25,63 @@
         </div>
     </nav>
 
-    <main>
-        <div class="card-container" style="max-width: 900px; text-align: center;">
-            <h2 style="color: var(--crimson);">Dialog Video Calling</h2>
-            <p>Start your camera, generate a Call ID, and send it to a friend to connect.</p>
+    <main style="display: flex; height: calc(100vh - 65px);">
+        
+        <div class="channel-sidebar" style="width: 300px; height: 100%;">
+            <div class="sidebar-header">
+                <h3>Your Chats</h3>
+                <button class="icon-btn" id="newChatBtn" title="New Chat" style="color: var(--crimson);">+</button>
+            </div>
+            <div id="chat-list" class="channel-list-container">
+                <p style="color: var(--text-muted); text-align: center; margin-top: 20px;">Loading chats...</p>
+            </div>
+        </div>
+
+        <div class="chat-main" style="position: relative;">
             
-            <div style="display: flex; gap: 20px; justify-content: center; margin-bottom: 20px; flex-wrap: wrap;">
-                <div style="position: relative; width: 400px; height: 300px; background: rgba(0,0,0,0.5); border-radius: 12px; border: 1px solid var(--glass-border); overflow: hidden;">
-                    <video id="localVideo" autoplay playsinline muted style="width: 100%; height: 100%; object-fit: cover;"></video>
-                    <span style="position: absolute; bottom: 10px; left: 10px; background: rgba(0,0,0,0.6); padding: 4px 8px; border-radius: 4px;">You</span>
-                </div>
-                <div style="position: relative; width: 400px; height: 300px; background: rgba(0,0,0,0.5); border-radius: 12px; border: 1px solid var(--glass-border); overflow: hidden;">
-                    <video id="remoteVideo" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
-                    <span style="position: absolute; bottom: 10px; left: 10px; background: rgba(0,0,0,0.6); padding: 4px 8px; border-radius: 4px;">Remote User</span>
+            <div class="chat-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 id="active-chat-name">Select a chat</h3>
+                <button id="startCallBtn" class="btn-primary" style="width: auto; padding: 6px 12px; display: none;">📞 Call</button>
+            </div>
+            
+            <div class="chat-content">
+                <div id="messages-box" class="messages-container">
+                    <p style="color: var(--text-muted); text-align: center; margin-top: 50px;">Select a conversation from the sidebar to start messaging.</p>
                 </div>
             </div>
 
-            <div style="background: rgba(10, 10, 12, 0.3); padding: 20px; border-radius: 12px; border: 1px solid var(--glass-border); display: flex; flex-direction: column; gap: 15px; align-items: center;">
+            <form id="message-form" class="chat-input-area" style="display:none;">
+                <input type="text" id="message-input" placeholder="Type a message..." autocomplete="off">
+            </form>
+
+            <div id="video-overlay" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10, 10, 12, 0.9); backdrop-filter: blur(10px); z-index: 50; flex-direction: column;">
                 
-                <div style="display: flex; gap: 10px; width: 100%; justify-content: center;">
-                    <button id="cameraBtn" class="btn-secondary" style="width: 200px;">1. Start Camera</button>
-                    <button id="callBtn" class="btn-primary" style="width: 200px;" disabled>2. Create Call</button>
-                    <button id="hangupBtn" class="btn-danger" style="width: 200px;" disabled>Hangup</button>
+                <div id="incoming-call-ui" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; z-index: 60; background: var(--glass-panel); padding: 40px; border-radius: 16px; border: 1px solid var(--glass-border);">
+                    <h2 style="color: var(--crimson);">Incoming Call...</h2>
+                    <div style="display: flex; gap: 15px; margin-top: 20px;">
+                        <button id="answerCallBtn" class="btn-secondary" style="background: #4ade80; color: #111;">Answer</button>
+                        <button id="declineCallBtn" class="btn-danger">Decline</button>
+                    </div>
                 </div>
 
-                <hr style="width: 80%; border-color: var(--glass-border); margin: 10px 0;">
-
-                <div style="display: flex; gap: 10px; width: 100%; max-width: 500px;">
-                    <input id="callInput" type="text" placeholder="Enter Call ID to Join..." style="margin: 0;">
-                    <button id="answerBtn" class="btn-secondary" style="width: 150px; background: #4ade80; color: #111;" disabled>3. Answer</button>
+                <div style="flex: 1; display: flex; justify-content: center; align-items: center; padding: 20px; gap: 20px;">
+                    <div style="position: relative; width: 45%; max-width: 600px; aspect-ratio: 4/3; background: #000; border-radius: 12px; overflow: hidden; border: 1px solid var(--glass-border);">
+                        <video id="localVideo" autoplay playsinline muted style="width: 100%; height: 100%; object-fit: cover;"></video>
+                        <span style="position: absolute; bottom: 10px; left: 10px; background: rgba(0,0,0,0.6); padding: 4px 8px; border-radius: 4px;">You</span>
+                    </div>
+                    <div style="position: relative; width: 45%; max-width: 600px; aspect-ratio: 4/3; background: #000; border-radius: 12px; overflow: hidden; border: 1px solid var(--glass-border);">
+                        <video id="remoteVideo" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
+                        <span style="position: absolute; bottom: 10px; left: 10px; background: rgba(0,0,0,0.6); padding: 4px 8px; border-radius: 4px;">Remote</span>
+                    </div>
                 </div>
 
-                <div style="background: rgba(220, 20, 60, 0.1); padding: 10px; border-radius: 8px; border: 1px dashed var(--crimson); width: 100%; max-width: 500px;">
-                    <strong>Your Call ID: </strong> <span id="callIdDisplay" style="user-select: all; font-family: monospace; color: #93c5fd;">Waiting...</span>
+                <div style="padding: 20px; display: flex; justify-content: center; gap: 15px; background: rgba(0,0,0,0.5);">
+                    <button id="toggleMicBtn" class="btn-secondary">Mute Mic</button>
+                    <button id="toggleCamBtn" class="btn-secondary">Cam Off</button>
+                    <button id="hangupBtn" class="btn-danger">Hangup</button>
                 </div>
             </div>
+
         </div>
     </main>
 
