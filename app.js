@@ -72,13 +72,10 @@ window.fetchHomeImages = async function() {
         gallery.innerHTML = `<p style="color:var(--crimson);">Error loading gallery.</p>`;
     }
 };
-window.fetchHomeImages();
 
-// --- TERMS OF SERVICE FETCHING ---
 window.fetchTerms = async function() {
     const termsBox = document.getElementById('terms-content');
     if(!termsBox) return;
-    
     try {
         const response = await fetch('terms.md');
         if (!response.ok) throw new Error("File not found or could not be loaded.");
@@ -89,11 +86,9 @@ window.fetchTerms = async function() {
     }
 };
 
-// --- TERMS OF SERVICE FETCHING ---
 window.fetchPrivacy = async function() {
     const privacyBox = document.getElementById('privacy-content');
     if(!privacyBox) return;
-    
     try {
         const response = await fetch('privacy.md');
         if (!response.ok) throw new Error("File not found or could not be loaded.");
@@ -262,15 +257,32 @@ window.closeActiveTicket = async function() {
     window.closeThreadView();
 };
 
+// --- ROUTING & LIQUID LIGHT BLOB ---
 window.routeTo = function(page) {
+    // Hide all pages and show the target page
     document.querySelectorAll('.page-content').forEach(p => p.style.display = 'none');
     const target = document.getElementById('page-' + page);
     if(target) target.style.display = 'block';
     
-    document.querySelectorAll('nav a').forEach(a => a.style.color = 'white');
-    const activeLink = document.querySelector(`nav a[onclick="routeTo('${page}')"]`);
-    if(activeLink) activeLink.style.color = 'var(--crimson)';
+    // Reset all text colors to muted
+    document.querySelectorAll('.nav-links a').forEach(a => a.style.color = 'var(--text-muted)');
+    
+    // Find the clicked link
+    const activeLink = document.querySelector(`.nav-links a[onclick="routeTo('${page}')"]`);
+    if(activeLink) {
+        // Highlight text white so it pops
+        activeLink.style.color = 'var(--text-main)'; 
+        
+        // Move the Liquid Light blob
+        const blob = document.getElementById('liquid-nav-blob');
+        if(blob) {
+            blob.style.opacity = '1';
+            blob.style.width = `${activeLink.offsetWidth}px`; 
+            blob.style.left = `${activeLink.offsetLeft}px`; 
+        }
+    }
 
+    // Trigger page-specific data fetching
     if(page === 'home') window.fetchHomeImages();
     if(page === 'updates') window.fetchNews();
     if(page === 'terms') window.fetchTerms();
@@ -316,7 +328,7 @@ window.openDiscovery = async function() {
             
             if(!membersList.includes(auth.currentUser.uid) && !bannedList.includes(auth.currentUser.uid)) {
                 foundServers = true;
-                const imgHtml = data.photoURL ? `<img src="${data.photoURL}">` : `<div style="width:80px;height:80px;border-radius:50%;background:#222;margin:0 auto 10px;line-height:80px;font-size:1.5rem;font-weight:bold;">${data.name.substring(0,2).toUpperCase()}</div>`;
+                const imgHtml = data.photoURL ? `<img src="${data.photoURL}">` : `<div style="width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,0.1);margin:0 auto 10px;line-height:80px;font-size:1.5rem;font-weight:bold;">${data.name.substring(0,2).toUpperCase()}</div>`;
                 discBox.innerHTML += `<div class="discovery-card">${imgHtml}<h3>${data.name}</h3><button class="btn-primary" onclick="joinServer('${docSnap.id}')">Join Server</button></div>`;
             }
         });
@@ -596,7 +608,7 @@ window.fetchTickets = async function() {
             const item = document.createElement('div');
             item.className = "auth-card";
             item.style.cursor = "pointer";
-            item.innerHTML = `<strong>${d.subject}</strong> <span style="float:right; color:${d.status === 'Open' ? '#0f0' : '#777'}">${d.status}</span><br><small>${d.userEmail}</small>`;
+            item.innerHTML = `<strong>${d.subject}</strong> <span style="float:right; color:${d.status === 'Open' ? '#4ade80' : '#94a3b8'}">${d.status}</span><br><small>${d.userEmail}</small>`;
             item.onclick = () => window.openThread(tDoc.id, d);
             list.appendChild(item);
         });
@@ -632,8 +644,8 @@ window.openThread = function(id, data) {
         snap.forEach(mDoc => {
             const m = mDoc.data();
             const isMe = m.sender === auth.currentUser.email;
-            box.innerHTML += `<div style="align-self:${isMe ? 'flex-end' : 'flex-start'}; background:${isMe ? 'var(--crimson)' : '#222'}; padding:8px 12px; border-radius:8px; max-width:80%; font-size:0.9rem;">
-                <small style="display:block; opacity:0.5; font-size:0.6rem;">${m.senderName || m.sender}</small>${m.text}</div>`;
+            box.innerHTML += `<div style="align-self:${isMe ? 'flex-end' : 'flex-start'}; background:${isMe ? 'var(--crimson)' : 'rgba(0,0,0,0.3)'}; padding:8px 12px; border-radius:8px; max-width:80%; font-size:0.9rem; border: 1px solid var(--glass-border);">
+                <small style="display:block; opacity:0.7; font-size:0.6rem;">${m.senderName || m.sender}</small>${m.text}</div>`;
         });
         box.scrollTop = box.scrollHeight;
     });
@@ -778,3 +790,8 @@ async function handleImageUpload(file, type) {
         console.error("IMGBB Error:", error);
     }
 }
+
+// Initialize Liquid Light blob on first load
+setTimeout(() => {
+    window.routeTo('home');
+}, 100);
