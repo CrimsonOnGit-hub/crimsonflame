@@ -68,27 +68,37 @@ nav {
     text-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
 }
 
-/* --- LIQUID LIGHT NAV BLOB & SVG FILTER --- */
+/* --- LIQUID LIGHT GOOEY BLOB CSS --- */
 .blob-container {
     position: absolute;
     top: 0; left: 0; right: 0; bottom: 0;
-    /* THIS FILTER CREATES THE PINCH */
-    filter: url('#goo');
+    filter: url('#goo'); /* Links to the invisible SVG at the top of the HTML */
     z-index: -1;
     pointer-events: none;
-    opacity: 0.5; /* Gives it the glassy look since the SVG needs solid colors */
+    opacity: 0.5; /* Keeps the entire blob semi-transparent to maintain the Glass look */
 }
 
-#liquid-nav-blob, .trail-blob {
+.nav-blob {
     position: absolute;
     height: 38px;
     top: 50%;
     transform: translateY(-50%);
-    background: var(--crimson); /* Needs to be solid for the filter */
+    background: rgb(220, 20, 60); /* Needs to be solid for the Goo filter to work */
     border-radius: 20px;
-    transition: all 0.4s cubic-bezier(0.4, 0.0, 0.2, 1);
-    opacity: 0;
+    left: 0;
+    width: 0;
 }
+
+/* The primary blob moves instantly */
+#blob-main {
+    transition: all 0.4s cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+/* The trail blob lingers behind, creating the stretch pinch */
+#blob-trail {
+    transition: all 0.4s cubic-bezier(0.4, 0.0, 0.2, 1) 0.1s; 
+}
+
 
 /* --- LAYOUT UTILITIES --- */
 main {
