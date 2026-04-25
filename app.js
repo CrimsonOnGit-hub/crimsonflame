@@ -266,42 +266,20 @@ window.routeTo = function(page) {
     document.querySelectorAll('.nav-links a').forEach(a => a.style.color = 'var(--text-muted)');
     
     const activeLink = document.querySelector(`.nav-links a[onclick="routeTo('${page}')"]`);
-    const blob = document.getElementById('liquid-nav-blob');
-    const blobContainer = document.querySelector('.blob-container');
+    const blobMain = document.getElementById('blob-main');
+    const blobTrail = document.getElementById('blob-trail');
 
-    if(activeLink && blob && blobContainer) {
+    if(activeLink && blobMain && blobTrail) {
         activeLink.style.color = 'var(--text-main)'; 
         
-        blob.style.opacity = '1';
+        // Push BOTH blobs to the new location. The CSS delay makes them pinch in the middle!
+        blobMain.style.width = `${activeLink.offsetWidth}px`; 
+        blobMain.style.left = `${activeLink.offsetLeft}px`; 
         
-        // If the blob is already somewhere, spawn a trail to create the pinch
-        if (blob.offsetWidth > 0) {
-            const trail = document.createElement('div');
-            trail.className = 'trail-blob';
-            trail.style.left = blob.style.left;
-            trail.style.width = blob.style.width;
-            blobContainer.appendChild(trail);
-
-            // Animate trail shrinking to 0
-            setTimeout(() => {
-                // Shrinks towards the new location
-                if (activeLink.offsetLeft > parseInt(trail.style.left)) {
-                    trail.style.left = `${parseInt(trail.style.left) + parseInt(trail.style.width)}px`;
-                }
-                trail.style.width = '0px';
-                trail.style.opacity = '0';
-            }, 10);
-
-            // Clean it up after the animation finishes
-            setTimeout(() => trail.remove(), 400);
-        }
-
-        // Shoot the main blob over to the new link
-        blob.style.width = `${activeLink.offsetWidth}px`; 
-        blob.style.left = `${activeLink.offsetLeft}px`; 
+        blobTrail.style.width = `${activeLink.offsetWidth}px`; 
+        blobTrail.style.left = `${activeLink.offsetLeft}px`; 
     }
 
-    // Try-Catch block prevents errors in one page from breaking the whole nav
     try {
         if(page === 'home') window.fetchHomeImages();
         if(page === 'updates') window.fetchNews();
