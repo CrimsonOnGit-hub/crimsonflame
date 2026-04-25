@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dialog | CrimsonFlame</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <nav>
+        <div class="nav-logo">CrimsonFlame <span style="color:var(--text-muted); font-size:1rem;">| Dialog</span></div>
+        <div class="nav-links">
+            <a href="index.html" style="color: var(--text-main);">← Back to Hub</a>
+        </div>
+    </nav>
+
+    <main>
+        <div class="card-container" style="max-width: 900px; text-align: center;">
+            <h2 style="color: var(--crimson);">Dialog Video Calling</h2>
+            <p>Start your camera, generate a Call ID, and send it to a friend to connect.</p>
+            
+            <div style="display: flex; gap: 20px; justify-content: center; margin-bottom: 20px; flex-wrap: wrap;">
+                <div style="position: relative; width: 400px; height: 300px; background: rgba(0,0,0,0.5); border-radius: 12px; border: 1px solid var(--glass-border); overflow: hidden;">
+                    <video id="localVideo" autoplay playsinline muted style="width: 100%; height: 100%; object-fit: cover;"></video>
+                    <span style="position: absolute; bottom: 10px; left: 10px; background: rgba(0,0,0,0.6); padding: 4px 8px; border-radius: 4px;">You</span>
+                </div>
+                <div style="position: relative; width: 400px; height: 300px; background: rgba(0,0,0,0.5); border-radius: 12px; border: 1px solid var(--glass-border); overflow: hidden;">
+                    <video id="remoteVideo" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
+                    <span style="position: absolute; bottom: 10px; left: 10px; background: rgba(0,0,0,0.6); padding: 4px 8px; border-radius: 4px;">Remote User</span>
+                </div>
+            </div>
+
+            <div style="background: rgba(10, 10, 12, 0.3); padding: 20px; border-radius: 12px; border: 1px solid var(--glass-border); display: flex; flex-direction: column; gap: 15px; align-items: center;">
+                
+                <div style="display: flex; gap: 10px; width: 100%; justify-content: center;">
+                    <button id="cameraBtn" class="btn-secondary" style="width: 200px;">1. Start Camera</button>
+                    <button id="callBtn" class="btn-primary" style="width: 200px;" disabled>2. Create Call</button>
+                    <button id="hangupBtn" class="btn-danger" style="width: 200px;" disabled>Hangup</button>
+                </div>
+
+                <hr style="width: 80%; border-color: var(--glass-border); margin: 10px 0;">
+
+                <div style="display: flex; gap: 10px; width: 100%; max-width: 500px;">
+                    <input id="callInput" type="text" placeholder="Enter Call ID to Join..." style="margin: 0;">
+                    <button id="answerBtn" class="btn-secondary" style="width: 150px; background: #4ade80; color: #111;" disabled>3. Answer</button>
+                </div>
+
+                <div style="background: rgba(220, 20, 60, 0.1); padding: 10px; border-radius: 8px; border: 1px dashed var(--crimson); width: 100%; max-width: 500px;">
+                    <strong>Your Call ID: </strong> <span id="callIdDisplay" style="user-select: all; font-family: monospace; color: #93c5fd;">Waiting...</span>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script type="module" src="dialog.js"></script>
+</body>
+</html>
