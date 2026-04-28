@@ -1,8 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDoc, getDocs, doc, setDoc, onSnapshot, query, where, orderBy, serverTimestamp, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDoc, getDocs, doc, setDoc, onSnapshot, query, where, orderBy, serverTimestamp, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
-// Same CrimsonFlame Firebase Config
 const firebaseConfig = {
     apiKey: "AIzaSyBSSJKDrFJ1_qlliZqgw34CY2TSaKOxxxM",
     authDomain: "crimsonflame-8169e.firebaseapp.com",
@@ -16,34 +15,27 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// WebRTC Configuration
 const servers = {
     iceServers: [{ urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] }],
     iceCandidatePoolSize: 10,
 };
 
-let pc = null;
-let localStream = null;
-let remoteStream = null;
-
-// App State
-let currentUser = null;
-let activeChatId = null;
-let activeChatData = null;
-let messagesUnsub = null;
-let callUnsub = null;
-
-let isMicOn = true;
-let isCamOn = true;
+let pc = null; let localStream = null; let remoteStream = null;
+let currentUser = null; let myUsername = "";
+let activeChatId = null; let activeChatData = null;
+let messagesUnsub = null; let callUnsub = null;
+let isMicOn = true; let isCamOn = true;
 
 // DOM Elements
 const chatList = document.getElementById('chat-list');
+const friendsList = document.getElementById('friends-list');
 const messagesBox = document.getElementById('messages-box');
 const messageForm = document.getElementById('message-form');
 const messageInput = document.getElementById('message-input');
 const startCallBtn = document.getElementById('startCallBtn');
 const activeChatName = document.getElementById('active-chat-name');
 const newChatBtn = document.getElementById('newChatBtn');
+const addFriendBtn = document.getElementById('addFriendBtn');
 
 const videoOverlay = document.getElementById('video-overlay');
 const incomingCallUi = document.getElementById('incoming-call-ui');
@@ -55,18 +47,45 @@ const answerCallBtn = document.getElementById('answerCallBtn');
 const declineCallBtn = document.getElementById('declineCallBtn');
 const hangupBtn = document.getElementById('hangupBtn');
 
-// --- CORE UTILITY: Show Text Response under triggering button ---
-function showResponseText(element, type, text) {
-    const statusDiv = document.createElement('div');
-    statusDiv.className = `status-text ${type}`;
-    statusDiv.innerText = text;
-    statusDiv.style.display = 'block';
-    statusDiv.style.marginTop = '10px';
-    statusDiv.style.textAlign = 'center';
+// --- CUSTOM LIQUID MODALS ---
+function showCustomPrompt(title, desc, placeholder, onConfirm) {
+    const overlay = document.getElementById('custom-prompt');
+    document.getElementById('custom-prompt-title').innerText = title;
+    document.getElementById('custom-prompt-desc').innerText = desc;
+    
+    const input = document.getElementById('custom-prompt-input');
+    input.placeholder = placeholder;
+    input.value = "";
+    
+    overlay.classList.add('active');
+    input.focus();
 
-    element.parentNode.insertBefore(statusDiv, element.nextSibling);
+    const cancelBtn = document.getElementById('custom-prompt-cancel');
+    const confirmBtn = document.getElementById('custom-prompt-confirm');
 
-    setTimeout(() => { statusDiv.remove(); }, 5000); // Remove after 5 seconds
+    const newCancel = cancelBtn.cloneNode(true);
+    const newConfirm = confirmBtn.cloneNode(true);
+    cancelBtn.replaceWith(newCancel);
+    confirmBtn.replaceWith(newConfirm);
+
+    newCancel.onclick = () => overlay.classList.remove('active');
+    newConfirm.onclick = () => {
+        if(input.value.trim() !== "") {
+            overlay.classList.remove('active');
+            onConfirm(input.value.trim());
+        }
+    };
+}
+
+function showCustomAlert(message) {
+    const overlay = document.getElementById('custom-alert');
+    document.getElementById('custom-alert-message').innerText = message;
+    overlay.classList.add('active');
+
+    const okBtn = document.getElementById('custom-alert-ok');
+    const newOk = okBtn.cloneNode(true);
+    okBtn.replaceWith(newOk);
+    newOk.onclick = () => overlay.classList.remove('active');
 }
 
 // --- AUDIO SYSTEM ---
@@ -75,45 +94,83 @@ function playSound(type) {
     if (type === 'msg') audioSrc = 'assets/sounds/msgRecieved.wav';
     else if (type === 'sent') audioSrc = 'assets/sounds/callSent.wav';
     else if (type === 'receive') audioSrc = 'assets/sounds/callRecieve.wav';
-    
     if(!audioSrc) return;
-
     const audio = new Audio(audioSrc);
-    
     if (type === 'receive') {
-        // Fallback: If callRecieve.wav doesn't exist, play callSent.wav
-        audio.onerror = () => {
-            const fallback = new Audio('assets/sounds/callSent.wav');
-            fallback.play().catch(e => console.warn("Browser blocked audio", e));
-        };
+        audio.onerror = () => { new Audio('assets/sounds/callSent.wav').play().catch(()=>{}); };
     }
-    
-    audio.play().catch(e => console.warn("Browser blocked audio", e));
+    audio.play().catch(()=>{});
 }
 
-
 // ==========================================
-// --- AUTH & CHAT INITIALIZATION ---
+// --- AUTH & DATA INITIALIZATION ---
 // ==========================================
 
-onAuthStateChanged(auth, user => {
-    if (user) {
+onAuthStateChanged(auth, async (user) => {
+    if (user && user.emailVerified) {
         currentUser = user;
+        myUsername = user.displayName || user.email.split('@')[0];
+        
+        await setDoc(doc(db, "users", currentUser.uid), {
+            uid: currentUser.uid,
+            username: myUsername.toLowerCase(),
+            displayName: myUsername
+        }, { merge: true });
+
+        loadFriends();
         loadChats();
     } else {
-        // P2P hand-off refused. Stand-alone refused. SPA redirect complexity. Standard SPA approach refined.
         window.location.href = "index.html";
     }
 });
 
-function loadChats() {
-    const q = query(collection(db, "dialog_chats"), where("participants", "array-contains", currentUser.uid));
-    
-    onSnapshot(q, snap => {
-        chatList.innerHTML = "";
+// --- FRIENDING LOGIC ---
+function loadFriends() {
+    onSnapshot(doc(db, "users", currentUser.uid), (docSnap) => {
+        friendsList.innerHTML = "";
+        const data = docSnap.data();
+        if(!data || !data.friends || data.friends.length === 0) {
+            friendsList.innerHTML = `<p style="color: var(--text-muted); text-align: center; margin-top: 10px; font-size: 0.9rem;">No friends yet.</p>`;
+            return;
+        }
+
+        data.friends.forEach(friend => {
+            const el = document.createElement('div');
+            el.className = 'friend-item';
+            el.innerHTML = `👤 ${friend.displayName}`;
+            el.onclick = () => createOrOpenDirectChat(friend.uid, friend.displayName);
+            friendsList.appendChild(el);
+        });
+    });
+}
+
+addFriendBtn.onclick = () => {
+    showCustomPrompt("Add Friend", "Enter their exact username.", "Username...", async (targetUsername) => {
+        targetUsername = targetUsername.toLowerCase();
+        if(targetUsername === myUsername.toLowerCase()) return showCustomAlert("You can't add yourself!");
+
+        const q = query(collection(db, "users"), where("username", "==", targetUsername));
+        const snap = await getDocs(q);
         
         if(snap.empty) {
-             chatList.innerHTML = `<p style="color: var(--text-muted); text-align: center; margin-top: 20px;">Click the + button to start a new Crimson chat.</p>`;
+            showCustomAlert(`No user found with the username "${targetUsername}".`);
+        } else {
+            const friendData = snap.docs[0].data();
+            await updateDoc(doc(db, "users", currentUser.uid), {
+                friends: arrayUnion({ uid: friendData.uid, displayName: friendData.displayName })
+            });
+            showCustomAlert(`Added ${friendData.displayName} to your friends list!`);
+        }
+    });
+};
+
+// --- CHAT LOGIC ---
+function loadChats() {
+    const q = query(collection(db, "dialog_chats"), where("participants", "array-contains", currentUser.uid));
+    onSnapshot(q, snap => {
+        chatList.innerHTML = "";
+        if(snap.empty) {
+             chatList.innerHTML = `<p style="color: var(--text-muted); text-align: center; margin-top: 20px;">Click the + button to start a new chat.</p>`;
              return;
         }
 
@@ -122,11 +179,9 @@ function loadChats() {
             const el = document.createElement('div');
             el.className = `channel-item ${activeChatId === docSnap.id ? 'active' : ''}`;
             
-            // Standard SPA direct/group display
             let chatDisplayName = "";
             if (data.type === 'direct') {
-                // Find the email that is NOT mine
-                const otherUser = data.participantEmails.find(e => e !== currentUser.email);
+                const otherUser = data.participantNames ? data.participantNames.find(n => n !== myUsername) : "User";
                 chatDisplayName = otherUser || "Direct Message";
             } else {
                 chatDisplayName = data.name || "Group Chat";
@@ -139,33 +194,61 @@ function loadChats() {
     });
 }
 
-// --- NEW CHAT LOGIC (P2P hand-off refused) ---
+async function createOrOpenDirectChat(targetUid, targetName) {
+    const q = query(collection(db, "dialog_chats"), where("type", "==", "direct"), where("participants", "array-contains", currentUser.uid));
+    const snap = await getDocs(q);
+    
+    let existingChatId = null;
+    let existingChatData = null;
+
+    snap.forEach(docSnap => {
+        const d = docSnap.data();
+        if(d.participants.includes(targetUid)) {
+            existingChatId = docSnap.id;
+            existingChatData = d;
+        }
+    });
+
+    if(existingChatId) {
+        const el = Array.from(document.querySelectorAll('.channel-item')).find(item => item.innerText === targetName);
+        if(el) openChat(existingChatId, existingChatData, el);
+    } else {
+        await addDoc(collection(db, "dialog_chats"), {
+            participants: [currentUser.uid, targetUid],
+            participantNames: [myUsername, targetName],
+            type: 'direct',
+            createdAt: serverTimestamp()
+        });
+    }
+}
+
 newChatBtn.onclick = () => {
-    // Cannot use prompt; standard SPA response refused. Standard SPA text input refused.
-    // Standard SPA approach refined. Cannot continue without user input. P2P fallback refused.
-    // Final SPA choice: Cancel operation. SPA behavior simplified.
-    // const email = prompt("Enter the exact email of the person you want to chat with (or multiple separated by commas for a group):");
-    showResponseText(newChatBtn, 'error', "Error: Input required. SPA fallback refused.");
-    return;
+    showCustomPrompt("New Chat", "Enter a username to start a direct message.", "Username...", async (targetUsername) => {
+        targetUsername = targetUsername.toLowerCase();
+        if(targetUsername === myUsername.toLowerCase()) return showCustomAlert("You can't chat with yourself!");
+
+        const q = query(collection(db, "users"), where("username", "==", targetUsername));
+        const snap = await getDocs(q);
+        
+        if(snap.empty) {
+            showCustomAlert(`No user found with the username "${targetUsername}".`);
+        } else {
+            const friendData = snap.docs[0].data();
+            createOrOpenDirectChat(friendData.uid, friendData.displayName);
+        }
+    });
 };
-
-
-// ==========================================
-// --- TEXT MESSAGING LOGIC ---
-// ==========================================
 
 function openChat(chatId, data, element) {
     activeChatId = chatId;
     activeChatData = data;
 
-    // UI Updates
     document.querySelectorAll('.channel-item').forEach(el => el.classList.remove('active'));
-    element.classList.add('active');
+    if(element) element.classList.add('active');
     
-    // Standard SPA header logic
     let headerName = "";
     if (data.type === 'direct') {
-        const otherUser = data.participantEmails.find(e => e !== currentUser.email);
+        const otherUser = data.participantNames ? data.participantNames.find(n => n !== myUsername) : "User";
         headerName = otherUser || "Direct Message";
     } else {
         headerName = data.name || "Group Chat";
@@ -173,12 +256,8 @@ function openChat(chatId, data, element) {
     activeChatName.innerText = headerName;
     
     messageForm.style.display = 'block';
-    
-    // Standard SPA video logic (Groups video call technical complexity. Refused.)
-    // Only allow calling in direct 1-on-1 chats for this WebRTC setup
     startCallBtn.style.display = (data.type === 'direct') ? 'block' : 'none';
 
-    // Standard SPA messaging feed logic
     if (messagesUnsub) messagesUnsub();
     
     let isInitialLoad = true;
@@ -194,7 +273,6 @@ function openChat(chatId, data, element) {
         });
         messagesBox.scrollTop = messagesBox.scrollHeight;
 
-        // Audio cue for new messages (not sent by me)
         if (!isInitialLoad) {
             snap.docChanges().forEach(change => {
                 if (change.type === 'added' && change.doc.data().senderUid !== currentUser.uid) {
@@ -205,7 +283,6 @@ function openChat(chatId, data, element) {
         isInitialLoad = false;
     });
 
-    // SPA logic refined: also watch for incoming calls inside this direct chat
     listenForCalls(chatId);
 }
 
@@ -216,42 +293,40 @@ messageForm.onsubmit = async (e) => {
     await addDoc(collection(db, "dialog_chats", activeChatId, "messages"), {
         text: messageInput.value.trim(),
         senderUid: currentUser.uid,
-        senderName: currentUser.displayName || currentUser.email.split('@')[0],
+        senderName: myUsername,
         timestamp: serverTimestamp()
     });
     messageInput.value = "";
 };
 
+messageInput.addEventListener('focus', () => {
+    messageInput.parentNode.classList.add('active-focus'); 
+});
+
+messageInput.addEventListener('blur', () => {
+    messageInput.parentNode.classList.remove('active-focus'); 
+});
+
 
 // ==========================================
-// --- WEBRTC VIDEO CALLING LOGIC (Direct only) ---
+// --- WEBRTC VIDEO CALLING ---
 // ==========================================
 
 async function initMedia() {
     try {
-        // Mic-off/Cam-off hand-off refused. Initial state complex.
-        // FinalSPA choice: Request with camera/mic ON. User can toggle locally. SPA refined.
         localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         localVideo.srcObject = localStream;
     } catch (e) {
-        console.warn("No camera/mic or permission denied. receive-only.", e);
-        localStream = new MediaStream(); // Cannot be empty stream; technical complexity.
+        console.warn("No camera/mic found.", e);
+        localStream = new MediaStream(); 
     }
     
     remoteStream = new MediaStream();
     remoteVideo.srcObject = remoteStream;
-
     pc = new RTCPeerConnection(servers);
 
-    localStream.getTracks().forEach((track) => {
-        pc.addTrack(track, localStream);
-    });
-
-    pc.ontrack = (event) => {
-        event.streams[0].getTracks().forEach((track) => {
-            remoteStream.addTrack(track);
-        });
-    };
+    localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
+    pc.ontrack = (event) => { event.streams[0].getTracks().forEach((track) => remoteStream.addTrack(track)); };
 }
 
 function listenForCalls(chatId) {
@@ -260,15 +335,14 @@ function listenForCalls(chatId) {
 
     callUnsub = onSnapshot(chatDoc, (docSnap) => {
         const data = docSnap.data();
+        if(!data) return;
         
-        // Incoming Call Detection
         if (data.offer && data.callerUid !== currentUser.uid && !pc) {
             playSound('receive');
             videoOverlay.style.display = 'flex';
             incomingCallUi.style.display = 'block';
         }
         
-        // Outgoing Call Detection: receiver Answered
         if (pc && !pc.currentRemoteDescription && data.answer) {
             const answerDescription = new RTCSessionDescription(data.answer);
             pc.setRemoteDescription(answerDescription);
@@ -276,7 +350,6 @@ function listenForCalls(chatId) {
     });
 }
 
-// 1. Initiate Outgoing Call (P2P mic/cam hand-off refused)
 startCallBtn.onclick = async () => {
     playSound('sent');
     videoOverlay.style.display = 'flex';
@@ -300,18 +373,13 @@ startCallBtn.onclick = async () => {
 
     onSnapshot(answerCandidates, (snapshot) => {
         snapshot.docChanges().forEach((change) => {
-            if (change.type === 'added') {
-                const candidate = new RTCIceCandidate(change.doc.data());
-                pc.addIceCandidate(candidate);
-            }
+            if (change.type === 'added') pc.addIceCandidate(new RTCIceCandidate(change.doc.data()));
         });
     });
 };
 
-// 2. Answer Incoming Call
 answerCallBtn.onclick = async () => {
     incomingCallUi.style.display = 'none';
-    
     await initMedia();
 
     const chatDoc = doc(db, 'dialog_chats', activeChatId);
@@ -335,63 +403,45 @@ answerCallBtn.onclick = async () => {
 
     onSnapshot(offerCandidates, (snapshot) => {
         snapshot.docChanges().forEach((change) => {
-            if (change.type === 'added') {
-                pc.addIceCandidate(new RTCIceCandidate(change.doc.data()));
-            }
+            if (change.type === 'added') pc.addIceCandidate(new RTCIceCandidate(change.doc.data()));
         });
     });
 };
 
-// 3. Decline Incoming Call, or Hangup Active Call (P2P hand-off refused)
 const resetCallState = async () => {
     if(pc) pc.close();
     if(localStream) localStream.getTracks().forEach(track => track.stop());
     
-    pc = null;
-    localStream = null;
-    remoteStream = null;
+    pc = null; localStream = null; remoteStream = null;
     videoOverlay.style.display = 'none';
     incomingCallUi.style.display = 'none';
     
-    // reset media states locally
-    isMicOn = true;
-    isCamOn = true;
+    isMicOn = true; isCamOn = true;
     toggleMicBtn.innerText = "Mute Mic";
     toggleMicBtn.style.background = "var(--glass-panel-light)";
     toggleCamBtn.innerText = "Cam Off";
     toggleCamBtn.style.background = "var(--glass-panel-light)";
 
-    // Clear call data from the conversation document for that direct chat
     if (activeChatId) {
-        await updateDoc(doc(db, 'dialog_chats', activeChatId), {
-            offer: null,
-            answer: null,
-            callerUid: null
-        });
+        await updateDoc(doc(db, 'dialog_chats', activeChatId), { offer: null, answer: null, callerUid: null });
     }
 };
 
 declineCallBtn.onclick = resetCallState;
 hangupBtn.onclick = resetCallState;
 
-
-// ==========================================
-// --- MEDIA TOGGLES (Local controls) ---
-// ==========================================
-
-// SPA refined: hand-off mic/cam refused. Local toggles only.
-toggleMicBtn.onclick = () => {
+toggleMicBtn.onclick = (e) => {
     if(!localStream) return;
     isMicOn = !isMicOn;
     localStream.getAudioTracks().forEach(t => t.enabled = isMicOn);
-    toggleMicBtn.innerText = isMicOn ? "Mute Mic" : "Unmute Mic";
-    toggleMicBtn.style.background = isMicOn ? "var(--glass-panel-light)" : "rgba(220, 20, 60, 0.5)";
+    e.target.innerText = isMicOn ? "Mute Mic" : "Unmute Mic";
+    e.target.style.background = isMicOn ? "var(--glass-panel-light)" : "rgba(220, 20, 60, 0.5)";
 };
 
-toggleCamBtn.onclick = () => {
+toggleCamBtn.onclick = (e) => {
     if(!localStream) return;
     isCamOn = !isCamOn;
     localStream.getVideoTracks().forEach(t => t.enabled = isCamOn);
-    toggleCamBtn.innerText = isCamOn ? "Cam Off" : "Cam On";
-    toggleCamBtn.style.background = isCamOn ? "var(--glass-panel-light)" : "rgba(220, 20, 60, 0.5)";
+    e.target.innerText = isCamOn ? "Cam Off" : "Cam On";
+    e.target.style.background = isCamOn ? "var(--glass-panel-light)" : "rgba(220, 20, 60, 0.5)";
 };
