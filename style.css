@@ -17,7 +17,7 @@
 body {
     margin: 0;
     padding: 0;
-    background-image: url('bg.png');
+    background-image: url('bg.png'); /* Assumes you have a bg.png */
     background-size: cover;
     background-position: center;
     background-attachment: fixed;
@@ -68,14 +68,13 @@ nav {
     text-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
 }
 
-/* --- LIQUID LIGHT GOOEY BLOB CSS --- */
+/* --- LIQUID LIGHT NAV BLOB --- */
 .blob-container {
     position: absolute;
     top: 0; left: 0; right: 0; bottom: 0;
-    filter: url('#goo'); /* Links to the SVG */
+    filter: url('#goo');
     z-index: -1;
     pointer-events: none;
-    /* REMOVED opacity here! SVG filters break if the parent has CSS opacity */
 }
 
 .nav-blob {
@@ -83,23 +82,19 @@ nav {
     height: 38px;
     top: 50%;
     transform: translateY(-50%);
-    /* Set to a darker crimson so it still looks glassy without CSS opacity */
     background: rgba(180, 10, 40, 0.9); 
     border-radius: 20px;
     left: 0;
     width: 0;
 }
 
-/* Primary blob moves instantly */
 #blob-main {
     transition: left 0.4s cubic-bezier(0.4, 0.0, 0.2, 1), width 0.4s cubic-bezier(0.4, 0.0, 0.2, 1);
 }
 
-/* Trail blob lingers 0.08s behind, creating the stretch/pinch effect */
 #blob-trail {
     transition: left 0.4s cubic-bezier(0.4, 0.0, 0.2, 1) 0.08s, width 0.4s cubic-bezier(0.4, 0.0, 0.2, 1) 0.08s; 
 }
-
 
 /* --- LAYOUT UTILITIES --- */
 main {
@@ -220,11 +215,6 @@ a:hover { opacity: 0.8; }
     background: rgba(255, 255, 255, 0.05);
 }
 
-.drop-zone.dragover {
-    border-color: var(--crimson);
-    background: rgba(220, 20, 60, 0.15);
-}
-
 .drop-zone img {
     max-width: 100px;
     max-height: 100px;
@@ -240,6 +230,9 @@ a:hover { opacity: 0.8; }
     margin-bottom: 10px;
     text-align: center;
 }
+.status-text.error {
+    color: #ef4444;
+}
 
 /* --- FEED & TICKETS --- */
 .news-card, .auth-card {
@@ -252,7 +245,6 @@ a:hover { opacity: 0.8; }
     backdrop-filter: blur(10px);
 }
 
-/* --- GALLERY --- */
 #home-gallery img {
     width: 100%;
     border-radius: 12px;
@@ -319,7 +311,7 @@ a:hover { opacity: 0.8; }
 .add-server-btn { color: #4ade80; font-size: 1.5rem; }
 
 .channel-sidebar {
-    width: 240px;
+    width: 300px;
     background: rgba(15, 15, 20, 0.3);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
@@ -350,7 +342,7 @@ a:hover { opacity: 0.8; }
     padding: 15px 10px;
 }
 
-.channel-item {
+.channel-item, .friend-item {
     padding: 10px 12px;
     border-radius: 8px;
     cursor: pointer;
@@ -358,9 +350,11 @@ a:hover { opacity: 0.8; }
     margin-bottom: 4px;
     transition: all 0.2s;
     border: 1px solid transparent;
+    display: flex;
+    align-items: center;
 }
 
-.channel-item:hover {
+.channel-item:hover, .friend-item:hover {
     background: rgba(255, 255, 255, 0.05);
     color: var(--text-main);
 }
@@ -507,13 +501,114 @@ a:hover { opacity: 0.8; }
     border: 2px solid rgba(255, 255, 255, 0.1);
 }
 
-.modal-overlay {
+/* --- LIQUID LIGHT POPUP SYSTEM (No Green Bar) --- */
+.custom-modal-overlay {
     position: fixed;
     top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.6);
-    backdrop-filter: blur(8px);
-    display: flex;
+    background: rgba(10, 10, 12, 0.4); 
+    backdrop-filter: blur(16px); 
+    -webkit-backdrop-filter: blur(16px);
+    display: none; 
     justify-content: center;
     align-items: center;
-    z-index: 1000;
+    z-index: 9999;
+}
+
+.custom-modal-overlay.active {
+    display: flex;
+}
+
+.custom-modal-box {
+    background: var(--glass-panel); 
+    border: 1px solid var(--glass-border); 
+    width: 90%;
+    max-width: 400px;
+    border-radius: 16px; 
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+    transform: translateY(20px) scale(0.95);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    text-align: center;
+    overflow: visible; 
+}
+
+.custom-modal-overlay.active .custom-modal-box {
+    transform: translateY(0) scale(1);
+}
+
+.custom-modal-content {
+    padding: 30px;
+}
+
+.custom-modal-title {
+    color: var(--text-main);
+    margin-top: 0;
+    margin-bottom: 15px;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+}
+
+.custom-modal-text {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin-top: 0;
+    margin-bottom: 20px;
+}
+
+.custom-modal-input {
+    width: 100%;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid var(--glass-border);
+    color: white;
+    border-radius: 20px; 
+    margin-bottom: 20px;
+    outline: none;
+    transition: all 0.3s ease;
+}
+
+.custom-modal-input:focus {
+    border-color: var(--crimson);
+    background: rgba(220, 20, 60, 0.1);
+}
+
+.custom-modal-btn {
+    cursor: pointer;
+    border: none;
+    padding: 10px 25px;
+    border-radius: 20px; 
+    font-weight: bold;
+    transition: all 0.3s ease;
+    width: 120px;
+}
+
+.custom-modal-btn.confirm {
+    background-color: var(--crimson);
+    color: white;
+    box-shadow: 0 4px 15px rgba(220, 20, 60, 0.3);
+}
+
+.custom-modal-btn.confirm:hover {
+    background-color: #b01030;
+    box-shadow: 0 6px 20px rgba(220, 20, 60, 0.5);
+    transform: translateY(-1px);
+}
+
+.custom-modal-btn.cancel {
+    background: var(--glass-panel-light);
+    border: 1px solid var(--glass-border);
+    color: var(--text-main);
+}
+
+.custom-modal-btn.cancel:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--glass-border-hover);
+}
+
+.custom-modal-buttons {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+}
+
+.active-focus {
+    box-shadow: 0 0 15px rgba(220, 20, 60, 0.2);
 }
