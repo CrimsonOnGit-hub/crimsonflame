@@ -66,6 +66,12 @@
                     <input type="password" id="password" placeholder="Password" required>
                     <button type="submit" class="btn-primary">Submit</button>
                 </form>
+                
+                <hr style="border-color: var(--glass-border); margin: 20px 0;">
+                <button type="button" class="btn-secondary" style="width: 100%; margin-bottom: 15px;" onclick="loginWithGoogle(event)">
+                    🌐 Continue with Google
+                </button>
+
                 <p>Don't have an account? <a href="#" id="toggle-auth" onclick="toggleLoginMode()">Register here</a></p>
             </div>
 
