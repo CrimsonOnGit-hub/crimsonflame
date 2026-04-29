@@ -103,6 +103,15 @@ const sfx = {
     receive: new Audio('assets/sounds/callRecieve.wav')
 };
 
+// Force buffer to prevent delays
+sfx.msg.load();
+sfx.sent.load();
+sfx.receive.load();
+
+sfx.receive.onerror = () => {
+    sfx.receive = new Audio('assets/sounds/callSent.wav');
+};
+
 function playSound(type) {
     if (!sfx[type]) return;
     sfx[type].currentTime = 0; 
@@ -114,7 +123,6 @@ function playSound(type) {
 // ==========================================
 
 onAuthStateChanged(auth, async (user) => {
-    // Allows email/password OR Google users
     if (user && (user.emailVerified || user.providerData.some(p => p.providerId === 'google.com'))) {
         currentUser = user;
         myUsername = user.displayName || user.email.split('@')[0];
@@ -353,7 +361,7 @@ function listenForCalls(chatId) {
         if(!data) return;
         
         if (data.offer && data.callerUid !== currentUser.uid && !pc) {
-            playSound('receive'); // PLAYS ONLY ON INCOMING CALL
+            playSound('receive');
             videoOverlay.style.display = 'flex';
             incomingCallUi.style.display = 'block';
         }
@@ -368,7 +376,7 @@ function listenForCalls(chatId) {
 }
 
 startCallBtn.onclick = async () => {
-    playSound('sent'); // PLAYS ONLY WHEN YOU CLICK "CALL"
+    playSound('sent');
     videoOverlay.style.display = 'flex';
     incomingCallUi.style.display = 'none';
 
