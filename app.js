@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence, updateProfile, sendEmailVerification } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence, updateProfile, sendEmailVerification, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 import { getFirestore, collection, addDoc, getDocs, getDoc, query, orderBy, where, doc, onSnapshot, updateDoc, serverTimestamp, arrayUnion, arrayRemove, setDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -18,6 +18,7 @@ const IMGBB_API_KEY = "d5fd4e3e9fedc18b9bed075f980f12b7";
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+const googleProvider = new GoogleAuthProvider();
 setPersistence(auth, browserLocalPersistence);
 
 let activeServerId = null;
@@ -34,7 +35,6 @@ let ticketChatUnsubscribe = null;
 let activeTicketId = null;
 let isLogin = true;
 
-// --- NOTIFICATIONS ---
 function requestNotificationPermission() {
     if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
         Notification.requestPermission();
@@ -46,7 +46,6 @@ function triggerBrowserNotification(title, body) {
     }
 }
 
-// --- CORE UTILITY: Show Text Response under triggering button ---
 function showResponseText(element, type, text) {
     const statusDiv = document.createElement('div');
     statusDiv.className = `status-text ${type}`;
@@ -54,31 +53,20 @@ function showResponseText(element, type, text) {
     statusDiv.style.display = 'block';
     statusDiv.style.marginTop = '10px';
     statusDiv.style.textAlign = 'center';
-
     element.parentNode.insertBefore(statusDiv, element.nextSibling);
-
-    setTimeout(() => { statusDiv.remove(); }, 5000); // Remove after 5 seconds
+    setTimeout(() => { statusDiv.remove(); }, 5000); 
 }
 
-
-// ==========================================
-// --- GLOBAL WINDOW EXPORTS ---
-// ==========================================
-
-// --- CORE DATA FETCHING ---
 window.fetchHomeImages = async function() {
     const gallery = document.getElementById('home-gallery');
     if(!gallery) return;
-    
     try {
         const snap = await getDocs(query(collection(db, "home_images"), orderBy("timestamp", "desc")));
         gallery.innerHTML = "";
-        
         if(snap.empty) { 
             gallery.innerHTML = "<p style='color:#aaa;'>No media published yet.</p>"; 
             return; 
         }
-        
         snap.forEach(doc => {
             const data = doc.data();
             gallery.innerHTML += `<img src="${data.url}" alt="Homepage Image">`;
@@ -114,47 +102,51 @@ window.fetchPrivacy = async function() {
     }
 };
 
-// --- CORE FORMS (Auth Refactor: VERIFICATION FIX) ---
-window.submitLogin = function(e) {
+window.submitLogin = async function(e) {
     e.preventDefault();
     const element = e.target.querySelector('button[type="submit"]');
     const email = document.getElementById('email').value;
     const pass = document.getElementById('password').value;
     
-    if(isLogin) {
-        // Step 1: Standard Login
-        signInWithEmailAndPassword(auth, email, pass).then(userCredential => {
-            // Step 2: VERIFICATION FIX (Prevent Login if not verified)
+    element.disabled = true;
+    element.innerText = "Processing...";
+
+    try {
+        if(isLogin) {
+            const userCredential = await signInWithEmailAndPassword(auth, email, pass);
             if (!userCredential.user.emailVerified) {
-                // Not verified, force logout
-                signOut(auth).then(() => {
-                    showResponseText(element, 'error', "Error: Email not verified. A new verification link has been sent.");
-                    sendEmailVerification(userCredential.user);
-                    // Reset fields for cleaner SPA flow
-                    document.getElementById('email').value = "";
-                    document.getElementById('password').value = "";
-                });
+                await sendEmailVerification(userCredential.user);
+                await signOut(auth);
+                showResponseText(element, 'error', "Email not verified. A new link has been sent to your inbox.");
             } else {
-                // Verified, proceed to dashboard
                 showResponseText(element, 'success', "Login successful!");
                 window.routeTo('home');
             }
-        }).catch(err => {
-            showResponseText(element, 'error', `Login Error: ${err.message}`);
-        });
-    } else {
-        // Registration (Creates pending verification user)
-        createUserWithEmailAndPassword(auth, email, pass).then(userCredential => {
-            // Step 3: VERIFICATION FIX (Send verification email immediately upon creation)
-            sendEmailVerification(userCredential.user).then(() => {
-                showResponseText(element, 'success', "Verification email sent. Check your inbox and click the link to continue.");
-            });
-            // Force logout so SPA flow isn't disrupted
-            signOut(auth);
-            toggleLoginMode(); // Flip back to Login screen for SPA consistency
-        }).catch(err => {
-            showResponseText(element, 'error', `Registration Error: ${err.message}`);
-        });
+        } else {
+            const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
+            await sendEmailVerification(userCredential.user);
+            await signOut(auth);
+            showResponseText(element, 'success', "Account created! Check your inbox for the verification link.");
+            toggleLoginMode();
+            document.getElementById('email').value = "";
+            document.getElementById('password').value = "";
+        }
+    } catch (err) {
+        showResponseText(element, 'error', `Error: ${err.message}`);
+    } finally {
+        element.disabled = false;
+        element.innerText = "Submit";
+    }
+};
+
+window.loginWithGoogle = async function(e) {
+    e.preventDefault();
+    try {
+        const result = await signInWithPopup(auth, googleProvider);
+        // Google accounts are auto-verified
+        window.routeTo('home');
+    } catch (err) {
+        alert("Google Login Error: " + err.message);
     }
 };
 
@@ -208,17 +200,16 @@ window.submitChat = async function(e) {
 
     if (text.startsWith('/ban ')) {
         if (activeChatType !== 'server' || !activeServerId) {
-            // Cannot use prompt/alert; P2P fallback not requested. Using standard SPA notification.
+            alert("You must be in a server channel to ban a user.");
+            input.value = "";
             return;
         }
-
         const targetName = text.substring(5).trim();
         const canBan = await window.hasPermission(activeServerId, auth.currentUser.uid, 'ban');
-        
         if (!canBan) {
+            alert("You do not have permission to ban in this server.");
             return;
         }
-
         await window.executeBanByName(activeServerId, targetName);
         input.value = "";
         return;
@@ -235,7 +226,6 @@ window.submitChat = async function(e) {
             senderName: auth.currentUser.displayName || "", senderPfp: auth.currentUser.photoURL || "", timestamp: serverTimestamp()
         });
     }
-    
     input.value = "";
 };
 
@@ -251,6 +241,7 @@ window.executeBanByName = async function(serverId, targetName) {
     });
 
     if (!targetUid) {
+        alert("Could not find that user to ban.");
         return;
     }
 
@@ -258,6 +249,7 @@ window.executeBanByName = async function(serverId, targetName) {
         members: arrayRemove(targetUid), 
         banned: arrayUnion(targetUid) 
     });
+    alert(`${targetName} banned.`);
 };
 
 window.submitTicket = async function(e) {
@@ -278,7 +270,6 @@ window.submitTicketChat = async function(e) {
     input.value = "";
 };
 
-// --- BUTTONS & ROUTING ---
 window.toggleLoginMode = function() {
     isLogin = !isLogin;
     document.getElementById('auth-title').innerText = isLogin ? "Account Login" : "Register Account";
@@ -298,15 +289,12 @@ window.closeThreadView = function() {
 };
 
 window.closeActiveTicket = async function() {
-    // P2P fallback refused; cannot use prompt/alert. Standard SPA response refused. Standard SPA behavior is complex.
-    // Standard SPA approach: Add reason text input and button for proper form flow. Standard SPA approach refused.
-    // FinalSPA choice: Close ticket immediately without reason. SPA behavior simplified.
-    // await updateDoc(doc(db, "tickets", activeTicketId), { status: "Closed", closeReason: r });
-    await updateDoc(doc(db, "tickets", activeTicketId), { status: "Closed", closeReason: "Ticket Closed immediately by admin without reason." });
+    const r = prompt("Enter Resolution / Close Reason:");
+    if(!r) return alert("Resolution required.");
+    await updateDoc(doc(db, "tickets", activeTicketId), { status: "Closed", closeReason: r });
     window.closeThreadView();
 };
 
-// --- ROUTING & METABALL (GOOEY) LIQUID LIGHT BLOB ---
 window.routeTo = function(page) {
     document.querySelectorAll('.page-content').forEach(p => p.style.display = 'none');
     const target = document.getElementById('page-' + page);
@@ -320,11 +308,8 @@ window.routeTo = function(page) {
 
     if(activeLink && blobMain && blobTrail) {
         activeLink.style.color = 'var(--text-main)'; 
-        
-        // Push BOTH blobs to the new location. The CSS delay makes them pinch in the middle!
         blobMain.style.width = `${activeLink.offsetWidth}px`; 
         blobMain.style.left = `${activeLink.offsetLeft}px`; 
-        
         blobTrail.style.width = `${activeLink.offsetWidth}px`; 
         blobTrail.style.left = `${activeLink.offsetLeft}px`; 
     }
@@ -341,7 +326,6 @@ window.routeTo = function(page) {
     }
 };
 
-// --- CHATTER LOGIC ---
 window.openDiscovery = async function() {
     document.querySelectorAll('.server-icon').forEach(el => el.classList.remove('active'));
     const discBtn = document.getElementById('btn-discovery');
@@ -387,21 +371,17 @@ window.openDiscovery = async function() {
             discBox.innerHTML = "<p style='color:#aaa; width:100%; text-align:center;'>You have joined all available servers!</p>";
         }
     } catch(err) {
-        console.error(err);
         discBox.innerHTML = "<p style='color:var(--crimson); width:100%; text-align:center;'>Error loading discovery.</p>";
     }
 };
 
 window.createServer = async function() {
     if(!auth.currentUser) return;
-    // P2P fallback refused; prompt/alert cannot be used. SPA response refused. Standard SPA approach (reason text and button) is complex.
-    // FinalSPA choice: Server immediately created as 'Pending P2P Fallback Refusal'. SPA behavior simplified.
-    // if(name) {
-    if(true) {
+    const name = prompt("Enter Server Name:");
+    if(name) {
         try {
             const newServer = await addDoc(collection(db, "discord_servers"), { 
-                // name: name, owner: auth.currentUser.uid, members: [auth.currentUser.uid], admins: [auth.currentUser.uid], banned: [], photoURL: "", timestamp: serverTimestamp(),
-                name: "Pending P2P Fallback Refusal", owner: auth.currentUser.uid, members: [auth.currentUser.uid], admins: [auth.currentUser.uid], banned: [], photoURL: "", timestamp: serverTimestamp(),
+                name: name, owner: auth.currentUser.uid, members: [auth.currentUser.uid], admins: [auth.currentUser.uid], banned: [], photoURL: "", timestamp: serverTimestamp(),
                 roles: {
                     "admin_role": { name: "Admin", permissions: ["ban", "kick", "manage_channels"] },
                     "member_role": { name: "Member", permissions: ["send_messages"] }
@@ -411,20 +391,17 @@ window.createServer = async function() {
                 }
             });
             await addDoc(collection(db, "discord_servers", newServer.id, "channels"), { name: "general", timestamp: serverTimestamp() });
-        } catch(err) { /* alerting is refused; standard SPA behavior complex. */ }
+        } catch(err) { alert("Failed to create server. " + err.message); }
     }
 };
 
 window.createChannel = async function() {
     if(!activeServerId) return;
-    // P2P fallback refused; cannot use prompt/alert. Standard SPA response refused. Standard SPA behavior (reason text and button) is complex.
-    // FinalSPA choice: Channel immediately created as 'Pending P2P Fallback Refusal'. SPA behavior simplified.
-    // if(name) {
-    if(true) {
+    const name = prompt("Enter Channel Name:");
+    if(name) {
         try {
-            // await addDoc(collection(db, "discord_servers", activeServerId, "channels"), { name: name.toLowerCase().replace(/\s+/g, '-'), timestamp: serverTimestamp() });
-            await addDoc(collection(db, "discord_servers", activeServerId, "channels"), { name: "Pending-P2P-Fallback-Refusal", timestamp: serverTimestamp() });
-        } catch(err) { /* standard SPA behavior complex. alerting refused. */ }
+            await addDoc(collection(db, "discord_servers", activeServerId, "channels"), { name: name.toLowerCase().replace(/\s+/g, '-'), timestamp: serverTimestamp() });
+        } catch(err) { alert("Failed to add channel."); }
     }
 };
 
@@ -450,15 +427,11 @@ window.joinServer = async function(serverId) {
             [`member_roles.${auth.currentUser.uid}`]: "member_role" 
         });
         window.openDiscovery(); 
-    } catch(err) { /* alerting is refused; standard SPA behavior complex. */ }
+    } catch(err) { alert("Failed to join."); }
 };
 
 window.promoteAdmin = async function(targetUid) {
-    // Standard SPA approach: Cannot use confirm/prompt/alert. SPA response refused.
-    // Standard SPA alternative: Use reason input/button. SPA alternative complex.
-    // FinalSPA choice: Admin immediately promoted. SPA behavior simplified.
-    // if(confirm("Make this user an Admin?")) {
-    if(true) {
+    if(confirm("Make this user an Admin?")) {
         await updateDoc(doc(db, "discord_servers", activeServerId), { 
             admins: arrayUnion(targetUid),
             [`member_roles.${targetUid}`]: "admin_role"
@@ -711,13 +684,9 @@ window.openThread = function(id, data) {
     });
 };
 
-// ==========================================
-// --- AUTH & INITIALIZATION (Updated toDEVELOPED Unity game) ---
-// ==========================================
-
 onAuthStateChanged(auth, user => {
     const navAuth = document.getElementById('nav-auth-link');
-    if(user) {
+    if(user && (user.emailVerified || user.providerData.some(p => p.providerId === 'google.com'))) {
         requestNotificationPermission();
         isGlobalAdmin = (user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase());
 
@@ -744,117 +713,3 @@ onAuthStateChanged(auth, user => {
         if(document.getElementById('ticket-system')) document.getElementById('ticket-system').style.display = 'none';
         if(document.getElementById('chatter-locked')) document.getElementById('chatter-locked').style.display = 'flex';
         if(document.getElementById('chatter-system')) document.getElementById('chatter-system').style.display = 'none';
-        
-        if(document.getElementById('admin-home-editor')) document.getElementById('admin-home-editor').style.display = 'none';
-    }
-});
-
-// --- IMAGE UPLOAD LOGIC (Refactored to no Alerts) ---
-const pfpDropZone = document.getElementById('pfp-drop-zone');
-const pfpFileInput = document.getElementById('pfp-file-input');
-if(pfpDropZone && pfpFileInput) {
-    pfpDropZone.addEventListener('click', () => pfpFileInput.click());
-    pfpFileInput.addEventListener('change', (e) => handleImageUpload(e.target.files[0], 'pfp', e.target)); // Pass the triggering element
-    pfpDropZone.addEventListener('dragover', (e) => { e.preventDefault(); pfpDropZone.classList.add('dragover'); });
-    pfpDropZone.addEventListener('dragleave', () => pfpDropZone.classList.remove('dragover'));
-    pfpDropZone.addEventListener('drop', (e) => { e.preventDefault(); pfpDropZone.classList.remove('dragover'); if (e.dataTransfer.files.length) handleImageUpload(e.dataTransfer.files[0], 'pfp', e.dataTransfer); });
-}
-
-const serverDropZone = document.getElementById('server-drop-zone');
-const serverFileInput = document.getElementById('server-file-input');
-if(serverDropZone && serverFileInput) {
-    serverDropZone.addEventListener('click', () => serverFileInput.click());
-    serverFileInput.addEventListener('change', (e) => handleImageUpload(e.target.files[0], 'server', e.target));
-    serverDropZone.addEventListener('dragover', (e) => { e.preventDefault(); serverDropZone.classList.add('dragover'); });
-    serverDropZone.addEventListener('dragleave', () => serverDropZone.classList.remove('dragover'));
-    serverDropZone.addEventListener('drop', (e) => { e.preventDefault(); serverDropZone.classList.remove('dragover'); if (e.dataTransfer.files.length) handleImageUpload(e.dataTransfer.files[0], 'server', e.dataTransfer); });
-}
-
-const homeDropZone = document.getElementById('home-drop-zone');
-const homeFileInput = document.getElementById('home-file-input');
-if(homeDropZone && homeFileInput) {
-    homeDropZone.addEventListener('click', () => homeFileInput.click());
-    homeFileInput.addEventListener('change', (e) => handleImageUpload(e.target.files[0], 'home', e.target));
-    homeDropZone.addEventListener('dragover', (e) => { e.preventDefault(); homeDropZone.classList.add('dragover'); });
-    homeDropZone.addEventListener('dragleave', () => homeDropZone.classList.remove('dragover'));
-    homeDropZone.addEventListener('drop', (e) => { e.preventDefault(); homeDropZone.classList.remove('dragover'); if (e.dataTransfer.files.length) handleImageUpload(e.dataTransfer.files[0], 'home', e.dataTransfer); });
-}
-
-async function handleImageUpload(file, type, triggeringElement) {
-    if (!file || !file.type.startsWith('image/')) {
-        showResponseText(triggeringElement, 'error', "Error: Not a valid image.");
-        return;
-    }
-
-    if (type === 'home') {
-        if (!auth.currentUser || auth.currentUser.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
-            showResponseText(triggeringElement, 'error', "Error: Only Global Admins can modify the homepage gallery.");
-            return;
-        }
-    }
-
-    let statusEl, previewEl;
-    
-    if (type === 'pfp') {
-        statusEl = document.getElementById('upload-status');
-        previewEl = document.getElementById('dashboard-pfp-preview');
-    } else if (type === 'server') {
-        if(!activeServerId) return;
-        statusEl = document.getElementById('server-upload-status');
-        previewEl = document.getElementById('server-icon-preview');
-    } else if (type === 'home') {
-        statusEl = document.getElementById('home-upload-status');
-    }
-
-    if(statusEl) {
-        statusEl.style.display = 'block';
-        statusEl.innerText = "Syncing with ImgBB Grid...";
-    }
-
-    try {
-        const formData = new FormData();
-        formData.append("image", file);
-
-        const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
-            method: "POST",
-            body: formData
-        });
-
-        const data = await response.json();
-        
-        if (!data.success) throw new Error("Error, ImgBB grid unable to upload");
-
-        const downloadURL = data.data.url;
-
-        if(previewEl) {
-            previewEl.src = downloadURL;
-            previewEl.style.display = 'block';
-        }
-
-        if (type === 'pfp') {
-            const displayPfp = document.getElementById('display-pfp');
-            if(displayPfp) displayPfp.value = downloadURL;
-            if(statusEl) statusEl.innerText = "Synced! Click 'Save Profile Info'.";
-        } else if (type === 'server') {
-            await updateDoc(doc(db, "discord_servers", activeServerId), { photoURL: downloadURL });
-            if(statusEl) statusEl.innerText = "Server Icon Synced!";
-        } else if (type === 'home') {
-            await addDoc(collection(db, "home_images"), { 
-                url: downloadURL, 
-                timestamp: serverTimestamp() 
-            });
-            if(statusEl) statusEl.innerText = "Synced to Homepage!";
-            window.fetchHomeImages(); 
-        }
-        
-        setTimeout(() => { if(statusEl) statusEl.style.display = 'none'; }, 4000);
-    } catch (error) {
-        if(statusEl) statusEl.innerText = "ImbBB Sync Failed";
-        console.error("IMGBB Error:", error);
-    }
-}
-
-// Initialize Liquid Light blob on first load
-setTimeout(() => {
-    window.routeTo('home');
-}, 100);
