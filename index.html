@@ -22,7 +22,6 @@
     <nav>
         <div class="nav-logo">CrimsonFlame</div>
         <div class="nav-links">
-            
             <div class="blob-container">
                 <div id="blob-main" class="nav-blob"></div> 
                 <div id="blob-trail" class="nav-blob"></div> 
@@ -40,7 +39,6 @@
     </nav>
 
     <main id="main-content">
-
         <div id="page-home" class="page-content" style="display: block;">
             <div class="card-container" style="max-width: 800px;">
                 <h2>Welcome to CrimsonFlame</h2>
@@ -201,17 +199,26 @@
         </div>
     </main>
 
-    <div id="server-settings-modal" class="custom-modal-overlay">
+    <div id="custom-prompt" class="custom-modal-overlay">
         <div class="custom-modal-box">
             <div class="custom-modal-content">
-                <h3 class="custom-modal-title">Server Settings</h3>
-                <div id="server-drop-zone" class="drop-zone">
-                    <img id="server-icon-preview" src="" alt="Server Icon" style="display:none; border-radius: 10px;">
-                    <span>Click or drop image to set server icon</span>
-                    <input type="file" id="server-file-input" accept="image/*" style="display:none;">
+                <h3 id="custom-prompt-title" class="custom-modal-title">Prompt</h3>
+                <p id="custom-prompt-desc" class="custom-modal-text"></p>
+                <input type="text" id="custom-prompt-input" class="custom-modal-input" autocomplete="off">
+                <div class="custom-modal-buttons">
+                    <button id="custom-prompt-cancel" class="custom-modal-btn cancel">Cancel</button>
+                    <button id="custom-prompt-confirm" class="custom-modal-btn confirm">Confirm</button>
                 </div>
-                <div id="server-upload-status" class="status-text"></div>
-                <button class="custom-modal-btn cancel" style="margin-top: 15px; width: 100%;" onclick="document.getElementById('server-settings-modal').style.display='none'">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="custom-alert" class="custom-modal-overlay">
+        <div class="custom-modal-box">
+            <div class="custom-modal-content">
+                <h3 class="custom-modal-title">CrimsonFlame Alert</h3>
+                <p id="custom-alert-message" class="custom-modal-text"></p>
+                <button id="custom-alert-ok" class="custom-modal-btn confirm" style="width: 50%;">OK</button>
             </div>
         </div>
     </div>
