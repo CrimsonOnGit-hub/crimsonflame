@@ -143,7 +143,6 @@ window.loginWithGoogle = async function(e) {
     e.preventDefault();
     try {
         const result = await signInWithPopup(auth, googleProvider);
-        // Google accounts are auto-verified
         window.routeTo('home');
     } catch (err) {
         alert("Google Login Error: " + err.message);
@@ -672,44 +671,3 @@ window.openThread = function(id, data) {
     
     ticketChatUnsubscribe = onSnapshot(query(collection(db, "tickets", id, "messages"), orderBy("timestamp", "asc")), snap => {
         const box = document.getElementById('ticket-chat-box');
-        if(!box) return;
-        box.innerHTML = "";
-        snap.forEach(mDoc => {
-            const m = mDoc.data();
-            const isMe = m.sender === auth.currentUser.email;
-            box.innerHTML += `<div style="align-self:${isMe ? 'flex-end' : 'flex-start'}; background:${isMe ? 'var(--crimson)' : 'rgba(0,0,0,0.3)'}; padding:8px 12px; border-radius:8px; max-width:80%; font-size:0.9rem; border: 1px solid var(--glass-border);">
-                <small style="display:block; opacity:0.7; font-size:0.6rem;">${m.senderName || m.sender}</small>${m.text}</div>`;
-        });
-        box.scrollTop = box.scrollHeight;
-    });
-};
-
-onAuthStateChanged(auth, user => {
-    const navAuth = document.getElementById('nav-auth-link');
-    if(user && (user.emailVerified || user.providerData.some(p => p.providerId === 'google.com'))) {
-        requestNotificationPermission();
-        isGlobalAdmin = (user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase());
-
-        if(navAuth) navAuth.innerText = "Dashboard";
-        if(document.getElementById('login-container')) document.getElementById('login-container').style.display = 'none';
-        if(document.getElementById('dashboard-container')) document.getElementById('dashboard-container').style.display = 'block';
-        if(document.getElementById('ticket-locked')) document.getElementById('ticket-locked').style.display = 'none';
-        if(document.getElementById('ticket-system')) document.getElementById('ticket-system').style.display = 'block';
-        if(document.getElementById('chatter-locked')) document.getElementById('chatter-locked').style.display = 'none';
-        if(document.getElementById('chatter-system')) document.getElementById('chatter-system').style.display = 'flex';
-        
-        if(document.getElementById('user-display-email')) document.getElementById('user-display-email').innerText = user.email;
-        if(document.getElementById('display-name')) document.getElementById('display-name').value = user.displayName || "";
-        if(document.getElementById('dashboard-pfp-preview')) document.getElementById('dashboard-pfp-preview').src = user.photoURL || DEFAULT_PFP;
-
-        if(document.getElementById('admin-panel')) document.getElementById('admin-panel').style.display = isGlobalAdmin ? 'block' : 'none';
-        if(document.getElementById('admin-home-editor')) document.getElementById('admin-home-editor').style.display = isGlobalAdmin ? 'block' : 'none';
-    } else {
-        isGlobalAdmin = false;
-        if(navAuth) navAuth.innerText = "Login";
-        if(document.getElementById('login-container')) document.getElementById('login-container').style.display = 'block';
-        if(document.getElementById('dashboard-container')) document.getElementById('dashboard-container').style.display = 'none';
-        if(document.getElementById('ticket-locked')) document.getElementById('ticket-locked').style.display = 'block';
-        if(document.getElementById('ticket-system')) document.getElementById('ticket-system').style.display = 'none';
-        if(document.getElementById('chatter-locked')) document.getElementById('chatter-locked').style.display = 'flex';
-        if(document.getElementById('chatter-system')) document.getElementById('chatter-system').style.display = 'none';
