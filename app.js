@@ -35,11 +35,81 @@ let ticketChatUnsubscribe = null;
 let activeTicketId = null;
 let isLogin = true;
 
+// --- CUSTOM LIQUID MODALS GLOBALS ---
+window.showCustomPrompt = function(title, desc, placeholder, onConfirm) {
+    const overlay = document.getElementById('custom-prompt');
+    const input = document.getElementById('custom-prompt-input');
+    const cancelBtn = document.getElementById('custom-prompt-cancel');
+    const confirmBtn = document.getElementById('custom-prompt-confirm');
+
+    document.getElementById('custom-prompt-title').innerText = title;
+    document.getElementById('custom-prompt-desc').innerText = desc;
+    
+    input.style.display = 'block';
+    input.placeholder = placeholder;
+    input.value = "";
+    
+    overlay.classList.add('active');
+    input.focus();
+
+    cancelBtn.onclick = () => overlay.classList.remove('active');
+    
+    const submitAction = () => {
+        if(input.value.trim() !== "") {
+            overlay.classList.remove('active');
+            onConfirm(input.value.trim());
+        }
+    };
+
+    confirmBtn.onclick = submitAction;
+
+    input.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            submitAction();
+        }
+    };
+};
+
+window.showCustomConfirm = function(title, desc, onConfirm) {
+    const overlay = document.getElementById('custom-prompt');
+    const input = document.getElementById('custom-prompt-input');
+    const cancelBtn = document.getElementById('custom-prompt-cancel');
+    const confirmBtn = document.getElementById('custom-prompt-confirm');
+
+    document.getElementById('custom-prompt-title').innerText = title;
+    document.getElementById('custom-prompt-desc').innerText = desc;
+    
+    input.style.display = 'none'; // Hide the input box
+    overlay.classList.add('active');
+
+    cancelBtn.onclick = () => {
+        overlay.classList.remove('active');
+        input.style.display = 'block'; // Reset for future prompts
+    };
+    confirmBtn.onclick = () => {
+        overlay.classList.remove('active');
+        input.style.display = 'block'; // Reset for future prompts
+        onConfirm();
+    };
+};
+
+window.showCustomAlert = function(message) {
+    const overlay = document.getElementById('custom-alert');
+    document.getElementById('custom-alert-message').innerText = message;
+    overlay.classList.add('active');
+
+    const okBtn = document.getElementById('custom-alert-ok');
+    okBtn.onclick = () => overlay.classList.remove('active');
+};
+
+
 function requestNotificationPermission() {
     if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
         Notification.requestPermission();
     }
 }
+
 function triggerBrowserNotification(title, body) {
     if ("Notification" in window && Notification.permission === "granted") {
         new Notification(title, { body: body, icon: DEFAULT_PFP });
@@ -57,6 +127,7 @@ function showResponseText(element, type, text) {
     setTimeout(() => { statusDiv.remove(); }, 5000); 
 }
 
+// ... Loading Functions
 window.fetchHomeImages = async function() {
     const gallery = document.getElementById('home-gallery');
     if(!gallery) return;
@@ -102,6 +173,7 @@ window.fetchPrivacy = async function() {
     }
 };
 
+// ... Auth Logic
 window.submitLogin = async function(e) {
     e.preventDefault();
     const element = e.target.querySelector('button[type="submit"]');
@@ -145,7 +217,7 @@ window.loginWithGoogle = async function(e) {
         await signInWithPopup(auth, googleProvider);
         window.routeTo('home');
     } catch (err) {
-        alert("Google Login Error: " + err.message);
+        window.showCustomAlert("Google Login Error: " + err.message);
     }
 };
 
@@ -191,6 +263,7 @@ window.hasPermission = async function(serverId, uid, requiredPermission) {
     return false;
 };
 
+// ... Chat and Server Logic
 window.submitChat = async function(e) {
     e.preventDefault();
     const input = document.getElementById('chat-input');
@@ -199,14 +272,14 @@ window.submitChat = async function(e) {
 
     if (text.startsWith('/ban ')) {
         if (activeChatType !== 'server' || !activeServerId) {
-            alert("You must be in a server channel to ban a user.");
+            window.showCustomAlert("You must be in a server channel to ban a user.");
             input.value = "";
             return;
         }
         const targetName = text.substring(5).trim();
         const canBan = await window.hasPermission(activeServerId, auth.currentUser.uid, 'ban');
         if (!canBan) {
-            alert("You do not have permission to ban in this server.");
+            window.showCustomAlert("You do not have permission to ban in this server.");
             return;
         }
         await window.executeBanByName(activeServerId, targetName);
@@ -240,7 +313,7 @@ window.executeBanByName = async function(serverId, targetName) {
     });
 
     if (!targetUid) {
-        alert("Could not find that user to ban.");
+        window.showCustomAlert("Could not find that user to ban.");
         return;
     }
 
@@ -248,9 +321,10 @@ window.executeBanByName = async function(serverId, targetName) {
         members: arrayRemove(targetUid), 
         banned: arrayUnion(targetUid) 
     });
-    alert(`${targetName} banned.`);
+    window.showCustomAlert(`${targetName} banned.`);
 };
 
+// ... Tickets
 window.submitTicket = async function(e) {
     e.preventDefault();
     const element = e.target.querySelector('button[type="submit"]');
@@ -288,10 +362,10 @@ window.closeThreadView = function() {
 };
 
 window.closeActiveTicket = async function() {
-    const r = prompt("Enter Resolution / Close Reason:");
-    if(!r) return alert("Resolution required.");
-    await updateDoc(doc(db, "tickets", activeTicketId), { status: "Closed", closeReason: r });
-    window.closeThreadView();
+    window.showCustomPrompt("Close Ticket", "Enter Resolution / Close Reason:", "Reason...", async (r) => {
+        await updateDoc(doc(db, "tickets", activeTicketId), { status: "Closed", closeReason: r });
+        window.closeThreadView();
+    });
 };
 
 window.routeTo = function(page) {
@@ -376,8 +450,7 @@ window.openDiscovery = async function() {
 
 window.createServer = async function() {
     if(!auth.currentUser) return;
-    const name = prompt("Enter Server Name:");
-    if(name) {
+    window.showCustomPrompt("Create Server", "Enter a name for your new server:", "Server Name...", async (name) => {
         try {
             const newServer = await addDoc(collection(db, "discord_servers"), { 
                 name: name, owner: auth.currentUser.uid, members: [auth.currentUser.uid], admins: [auth.currentUser.uid], banned: [], photoURL: "", timestamp: serverTimestamp(),
@@ -390,18 +463,17 @@ window.createServer = async function() {
                 }
             });
             await addDoc(collection(db, "discord_servers", newServer.id, "channels"), { name: "general", timestamp: serverTimestamp() });
-        } catch(err) { alert("Failed to create server. " + err.message); }
-    }
+        } catch(err) { window.showCustomAlert("Failed to create server. " + err.message); }
+    });
 };
 
 window.createChannel = async function() {
     if(!activeServerId) return;
-    const name = prompt("Enter Channel Name:");
-    if(name) {
+    window.showCustomPrompt("Add Channel", "Enter the new channel name:", "Channel Name...", async (name) => {
         try {
             await addDoc(collection(db, "discord_servers", activeServerId, "channels"), { name: name.toLowerCase().replace(/\s+/g, '-'), timestamp: serverTimestamp() });
-        } catch(err) { alert("Failed to add channel."); }
-    }
+        } catch(err) { window.showCustomAlert("Failed to add channel."); }
+    });
 };
 
 window.openServerSettings = async function() {
@@ -426,17 +498,17 @@ window.joinServer = async function(serverId) {
             [`member_roles.${auth.currentUser.uid}`]: "member_role" 
         });
         window.openDiscovery(); 
-    } catch(err) { alert("Failed to join."); }
+    } catch(err) { window.showCustomAlert("Failed to join."); }
 };
 
 window.promoteAdmin = async function(targetUid) {
-    if(confirm("Make this user an Admin?")) {
+    window.showCustomConfirm("Promote Admin", "Make this user an Admin?", async () => {
         await updateDoc(doc(db, "discord_servers", activeServerId), { 
             admins: arrayUnion(targetUid),
             [`member_roles.${targetUid}`]: "admin_role"
         });
         activeServerAdmins.push(targetUid); 
-    }
+    });
 };
 
 window.openDM = async function(targetUid, targetName) {
@@ -749,13 +821,13 @@ if(homeDropZone && homeFileInput) {
 
 async function handleImageUpload(file, type, triggeringElement) {
     if (!file || !file.type.startsWith('image/')) {
-        showResponseText(triggeringElement, 'error', "Error: Not a valid image.");
+        window.showCustomAlert("Error: Not a valid image.");
         return;
     }
 
     if (type === 'home') {
         if (!auth.currentUser || auth.currentUser.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
-            showResponseText(triggeringElement, 'error', "Error: Only Global Admins can modify the homepage gallery.");
+            window.showCustomAlert("Error: Only Global Admins can modify the homepage gallery.");
             return;
         }
     }
