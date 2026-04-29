@@ -20,11 +20,19 @@ const servers = {
     iceCandidatePoolSize: 10,
 };
 
-let pc = null; let localStream = null; let remoteStream = null;
-let currentUser = null; let myUsername = "";
-let activeChatId = null; let activeChatData = null;
-let messagesUnsub = null; let callUnsub = null;
-let isMicOn = true; let isCamOn = true;
+let pc = null; 
+let localStream = null; 
+let remoteStream = null;
+let currentUser = null; 
+let myUsername = "";
+let activeChatId = null; 
+let activeChatData = null;
+let messagesUnsub = null; 
+let callUnsub = null;
+let isMicOn = true; 
+let isCamOn = true;
+
+let iceQueue = [];
 
 // DOM Elements
 const chatList = document.getElementById('chat-list');
@@ -88,24 +96,17 @@ function showCustomAlert(message) {
     newOk.onclick = () => overlay.classList.remove('active');
 }
 
-// --- AUDIO SYSTEM (Preloaded) ---
+// --- AUDIO SYSTEM ---
 const sfx = {
     msg: new Audio('assets/sounds/msgRecieved.wav'),
     sent: new Audio('assets/sounds/callSent.wav'),
     receive: new Audio('assets/sounds/callRecieve.wav')
 };
 
-sfx.receive.onerror = () => {
-    console.warn("callRecieve.wav missing, falling back to callSent.wav");
-    sfx.receive = new Audio('assets/sounds/callSent.wav');
-};
-
 function playSound(type) {
     if (!sfx[type]) return;
     sfx[type].currentTime = 0; 
-    sfx[type].play().catch(e => {
-        console.warn(`Browser blocked the '${type}' sound! You must click somewhere on the page first.`, e);
-    });
+    sfx[type].play().catch(() => {});
 }
 
 // ==========================================
@@ -113,7 +114,8 @@ function playSound(type) {
 // ==========================================
 
 onAuthStateChanged(auth, async (user) => {
-    if (user && user.emailVerified) {
+    // Allows email/password OR Google users
+    if (user && (user.emailVerified || user.providerData.some(p => p.providerId === 'google.com'))) {
         currentUser = user;
         myUsername = user.displayName || user.email.split('@')[0];
         
@@ -306,7 +308,6 @@ messageForm.onsubmit = async (e) => {
 };
 
 messageInput.addEventListener('focus', () => {
-    playSound('sent'); 
     messageInput.parentNode.classList.add('active-focus'); 
 });
 
@@ -318,6 +319,13 @@ messageInput.addEventListener('blur', () => {
 // ==========================================
 // --- WEBRTC VIDEO CALLING ---
 // ==========================================
+
+function processIceQueue() {
+    iceQueue.forEach(candidate => {
+        pc.addIceCandidate(candidate).catch(e => console.error("Error adding queued ICE Candidate:", e));
+    });
+    iceQueue = [];
+}
 
 async function initMedia() {
     try {
@@ -345,24 +353,27 @@ function listenForCalls(chatId) {
         if(!data) return;
         
         if (data.offer && data.callerUid !== currentUser.uid && !pc) {
-            playSound('receive');
+            playSound('receive'); // PLAYS ONLY ON INCOMING CALL
             videoOverlay.style.display = 'flex';
             incomingCallUi.style.display = 'block';
         }
         
         if (pc && !pc.currentRemoteDescription && data.answer) {
             const answerDescription = new RTCSessionDescription(data.answer);
-            pc.setRemoteDescription(answerDescription);
+            pc.setRemoteDescription(answerDescription).then(() => {
+                processIceQueue(); 
+            });
         }
     });
 }
 
 startCallBtn.onclick = async () => {
-    playSound('sent');
+    playSound('sent'); // PLAYS ONLY WHEN YOU CLICK "CALL"
     videoOverlay.style.display = 'flex';
     incomingCallUi.style.display = 'none';
 
     await initMedia();
+    iceQueue = []; 
 
     const chatDoc = doc(db, 'dialog_chats', activeChatId);
     const offerCandidates = collection(chatDoc, 'offerCandidates');
@@ -380,14 +391,23 @@ startCallBtn.onclick = async () => {
 
     onSnapshot(answerCandidates, (snapshot) => {
         snapshot.docChanges().forEach((change) => {
-            if (change.type === 'added') pc.addIceCandidate(new RTCIceCandidate(change.doc.data()));
+            if (change.type === 'added') {
+                const candidate = new RTCIceCandidate(change.doc.data());
+                if (pc.remoteDescription) {
+                    pc.addIceCandidate(candidate);
+                } else {
+                    iceQueue.push(candidate); 
+                }
+            }
         });
     });
 };
 
 answerCallBtn.onclick = async () => {
     incomingCallUi.style.display = 'none';
+    
     await initMedia();
+    iceQueue = [];
 
     const chatDoc = doc(db, 'dialog_chats', activeChatId);
     const offerCandidates = collection(chatDoc, 'offerCandidates');
@@ -410,7 +430,14 @@ answerCallBtn.onclick = async () => {
 
     onSnapshot(offerCandidates, (snapshot) => {
         snapshot.docChanges().forEach((change) => {
-            if (change.type === 'added') pc.addIceCandidate(new RTCIceCandidate(change.doc.data()));
+            if (change.type === 'added') {
+                const candidate = new RTCIceCandidate(change.doc.data());
+                if (pc.remoteDescription) {
+                    pc.addIceCandidate(candidate);
+                } else {
+                    iceQueue.push(candidate);
+                }
+            }
         });
     });
 };
@@ -420,6 +447,7 @@ const resetCallState = async () => {
     if(localStream) localStream.getTracks().forEach(track => track.stop());
     
     pc = null; localStream = null; remoteStream = null;
+    iceQueue = []; 
     videoOverlay.style.display = 'none';
     incomingCallUi.style.display = 'none';
     
