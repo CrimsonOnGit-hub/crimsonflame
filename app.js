@@ -142,7 +142,7 @@ window.submitLogin = async function(e) {
 window.loginWithGoogle = async function(e) {
     e.preventDefault();
     try {
-        const result = await signInWithPopup(auth, googleProvider);
+        await signInWithPopup(auth, googleProvider);
         window.routeTo('home');
     } catch (err) {
         alert("Google Login Error: " + err.message);
