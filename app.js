@@ -671,3 +671,156 @@ window.openThread = function(id, data) {
     
     ticketChatUnsubscribe = onSnapshot(query(collection(db, "tickets", id, "messages"), orderBy("timestamp", "asc")), snap => {
         const box = document.getElementById('ticket-chat-box');
+        if(!box) return;
+        box.innerHTML = "";
+        snap.forEach(mDoc => {
+            const m = mDoc.data();
+            const isMe = m.sender === auth.currentUser.email;
+            box.innerHTML += `<div style="align-self:${isMe ? 'flex-end' : 'flex-start'}; background:${isMe ? 'var(--crimson)' : 'rgba(0,0,0,0.3)'}; padding:8px 12px; border-radius:8px; max-width:80%; font-size:0.9rem; border: 1px solid var(--glass-border);">
+                <small style="display:block; opacity:0.7; font-size:0.6rem;">${m.senderName || m.sender}</small>${m.text}</div>`;
+        });
+        box.scrollTop = box.scrollHeight;
+    });
+};
+
+onAuthStateChanged(auth, user => {
+    const navAuth = document.getElementById('nav-auth-link');
+    if(user && (user.emailVerified || user.providerData.some(p => p.providerId === 'google.com'))) {
+        requestNotificationPermission();
+        isGlobalAdmin = (user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase());
+
+        if(navAuth) navAuth.innerText = "Dashboard";
+        if(document.getElementById('login-container')) document.getElementById('login-container').style.display = 'none';
+        if(document.getElementById('dashboard-container')) document.getElementById('dashboard-container').style.display = 'block';
+        if(document.getElementById('ticket-locked')) document.getElementById('ticket-locked').style.display = 'none';
+        if(document.getElementById('ticket-system')) document.getElementById('ticket-system').style.display = 'block';
+        if(document.getElementById('chatter-locked')) document.getElementById('chatter-locked').style.display = 'none';
+        if(document.getElementById('chatter-system')) document.getElementById('chatter-system').style.display = 'flex';
+        
+        if(document.getElementById('user-display-email')) document.getElementById('user-display-email').innerText = user.email;
+        if(document.getElementById('display-name')) document.getElementById('display-name').value = user.displayName || "";
+        if(document.getElementById('dashboard-pfp-preview')) document.getElementById('dashboard-pfp-preview').src = user.photoURL || DEFAULT_PFP;
+
+        if(document.getElementById('admin-panel')) document.getElementById('admin-panel').style.display = isGlobalAdmin ? 'block' : 'none';
+        if(document.getElementById('admin-home-editor')) document.getElementById('admin-home-editor').style.display = isGlobalAdmin ? 'block' : 'none';
+    } else {
+        isGlobalAdmin = false;
+        if(navAuth) navAuth.innerText = "Login";
+        if(document.getElementById('login-container')) document.getElementById('login-container').style.display = 'block';
+        if(document.getElementById('dashboard-container')) document.getElementById('dashboard-container').style.display = 'none';
+        if(document.getElementById('ticket-locked')) document.getElementById('ticket-locked').style.display = 'block';
+        if(document.getElementById('ticket-system')) document.getElementById('ticket-system').style.display = 'none';
+        if(document.getElementById('chatter-locked')) document.getElementById('chatter-locked').style.display = 'flex';
+        if(document.getElementById('chatter-system')) document.getElementById('chatter-system').style.display = 'none';
+        
+        if(document.getElementById('admin-home-editor')) document.getElementById('admin-home-editor').style.display = 'none';
+    }
+});
+
+const pfpDropZone = document.getElementById('pfp-drop-zone');
+const pfpFileInput = document.getElementById('pfp-file-input');
+if(pfpDropZone && pfpFileInput) {
+    pfpDropZone.addEventListener('click', () => pfpFileInput.click());
+    pfpFileInput.addEventListener('change', (e) => handleImageUpload(e.target.files[0], 'pfp', e.target)); 
+    pfpDropZone.addEventListener('dragover', (e) => { e.preventDefault(); pfpDropZone.classList.add('dragover'); });
+    pfpDropZone.addEventListener('dragleave', () => pfpDropZone.classList.remove('dragover'));
+    pfpDropZone.addEventListener('drop', (e) => { e.preventDefault(); pfpDropZone.classList.remove('dragover'); if (e.dataTransfer.files.length) handleImageUpload(e.dataTransfer.files[0], 'pfp', e.dataTransfer); });
+}
+
+const serverDropZone = document.getElementById('server-drop-zone');
+const serverFileInput = document.getElementById('server-file-input');
+if(serverDropZone && serverFileInput) {
+    serverDropZone.addEventListener('click', () => serverFileInput.click());
+    serverFileInput.addEventListener('change', (e) => handleImageUpload(e.target.files[0], 'server', e.target));
+    serverDropZone.addEventListener('dragover', (e) => { e.preventDefault(); serverDropZone.classList.add('dragover'); });
+    serverDropZone.addEventListener('dragleave', () => serverDropZone.classList.remove('dragover'));
+    serverDropZone.addEventListener('drop', (e) => { e.preventDefault(); serverDropZone.classList.remove('dragover'); if (e.dataTransfer.files.length) handleImageUpload(e.dataTransfer.files[0], 'server', e.dataTransfer); });
+}
+
+const homeDropZone = document.getElementById('home-drop-zone');
+const homeFileInput = document.getElementById('home-file-input');
+if(homeDropZone && homeFileInput) {
+    homeDropZone.addEventListener('click', () => homeFileInput.click());
+    homeFileInput.addEventListener('change', (e) => handleImageUpload(e.target.files[0], 'home', e.target));
+    homeDropZone.addEventListener('dragover', (e) => { e.preventDefault(); homeDropZone.classList.add('dragover'); });
+    homeDropZone.addEventListener('dragleave', () => homeDropZone.classList.remove('dragover'));
+    homeDropZone.addEventListener('drop', (e) => { e.preventDefault(); homeDropZone.classList.remove('dragover'); if (e.dataTransfer.files.length) handleImageUpload(e.dataTransfer.files[0], 'home', e.dataTransfer); });
+}
+
+async function handleImageUpload(file, type, triggeringElement) {
+    if (!file || !file.type.startsWith('image/')) {
+        showResponseText(triggeringElement, 'error', "Error: Not a valid image.");
+        return;
+    }
+
+    if (type === 'home') {
+        if (!auth.currentUser || auth.currentUser.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+            showResponseText(triggeringElement, 'error', "Error: Only Global Admins can modify the homepage gallery.");
+            return;
+        }
+    }
+
+    let statusEl, previewEl;
+    
+    if (type === 'pfp') {
+        statusEl = document.getElementById('upload-status');
+        previewEl = document.getElementById('dashboard-pfp-preview');
+    } else if (type === 'server') {
+        if(!activeServerId) return;
+        statusEl = document.getElementById('server-upload-status');
+        previewEl = document.getElementById('server-icon-preview');
+    } else if (type === 'home') {
+        statusEl = document.getElementById('home-upload-status');
+    }
+
+    if(statusEl) {
+        statusEl.style.display = 'block';
+        statusEl.innerText = "Syncing with ImgBB Grid...";
+    }
+
+    try {
+        const formData = new FormData();
+        formData.append("image", file);
+
+        const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+            method: "POST",
+            body: formData
+        });
+
+        const data = await response.json();
+        
+        if (!data.success) throw new Error("Error, ImgBB grid unable to upload");
+
+        const downloadURL = data.data.url;
+
+        if(previewEl) {
+            previewEl.src = downloadURL;
+            previewEl.style.display = 'block';
+        }
+
+        if (type === 'pfp') {
+            const displayPfp = document.getElementById('display-pfp');
+            if(displayPfp) displayPfp.value = downloadURL;
+            if(statusEl) statusEl.innerText = "Synced! Click 'Save Profile Info'.";
+        } else if (type === 'server') {
+            await updateDoc(doc(db, "discord_servers", activeServerId), { photoURL: downloadURL });
+            if(statusEl) statusEl.innerText = "Server Icon Synced!";
+        } else if (type === 'home') {
+            await addDoc(collection(db, "home_images"), { 
+                url: downloadURL, 
+                timestamp: serverTimestamp() 
+            });
+            if(statusEl) statusEl.innerText = "Synced to Homepage!";
+            window.fetchHomeImages(); 
+        }
+        
+        setTimeout(() => { if(statusEl) statusEl.style.display = 'none'; }, 4000);
+    } catch (error) {
+        if(statusEl) statusEl.innerText = "ImbBB Sync Failed";
+        console.error("IMGBB Error:", error);
+    }
+}
+
+setTimeout(() => {
+    window.routeTo('home');
+}, 100);
