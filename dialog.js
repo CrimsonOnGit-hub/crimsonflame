@@ -88,18 +88,24 @@ function showCustomAlert(message) {
     newOk.onclick = () => overlay.classList.remove('active');
 }
 
-// --- AUDIO SYSTEM ---
+// --- AUDIO SYSTEM (Preloaded) ---
+const sfx = {
+    msg: new Audio('assets/sounds/msgRecieved.wav'),
+    sent: new Audio('assets/sounds/callSent.wav'),
+    receive: new Audio('assets/sounds/callRecieve.wav')
+};
+
+sfx.receive.onerror = () => {
+    console.warn("callRecieve.wav missing, falling back to callSent.wav");
+    sfx.receive = new Audio('assets/sounds/callSent.wav');
+};
+
 function playSound(type) {
-    let audioSrc = '';
-    if (type === 'msg') audioSrc = 'assets/sounds/msgRecieved.wav';
-    else if (type === 'sent') audioSrc = 'assets/sounds/callSent.wav';
-    else if (type === 'receive') audioSrc = 'assets/sounds/callRecieve.wav';
-    if(!audioSrc) return;
-    const audio = new Audio(audioSrc);
-    if (type === 'receive') {
-        audio.onerror = () => { new Audio('assets/sounds/callSent.wav').play().catch(()=>{}); };
-    }
-    audio.play().catch(()=>{});
+    if (!sfx[type]) return;
+    sfx[type].currentTime = 0; 
+    sfx[type].play().catch(e => {
+        console.warn(`Browser blocked the '${type}' sound! You must click somewhere on the page first.`, e);
+    });
 }
 
 // ==========================================
@@ -300,6 +306,7 @@ messageForm.onsubmit = async (e) => {
 };
 
 messageInput.addEventListener('focus', () => {
+    playSound('sent'); 
     messageInput.parentNode.classList.add('active-focus'); 
 });
 
