@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatter | CrimsonFlame</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body style="overflow: hidden;">
+
+    <svg style="position: absolute; pointer-events: none; width: 0; height: 0;" xmlns="http://www.w3.org/2000/svg" version="1.1">
+        <defs><filter id="goo"><feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur" /><feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 19 -9" result="goo" /><feComposite in="SourceGraphic" in2="goo" operator="atop"/></filter></defs>
+    </svg>
+
+    <nav>
+        <div class="nav-logo">CrimsonFlame <span style="color:var(--text-muted); font-size:1rem;">| Chatter</span></div>
+        <div class="nav-links">
+            <a href="index.html">← Back to Hub</a>
+            <a href="dialog.html" style="color: #93c5fd; font-weight: bold; margin-left: 15px;">Dialog (Call)</a>
+        </div>
+    </nav>
+
+    <main style="display: flex; height: calc(100vh - 65px);">
+        
+        <div id="chatter-locked" class="card-container" style="margin: auto; width: 100%; max-width: 400px; text-align: center;">
+            <h2>Chatter Access Locked</h2><p>Please log in on the Hub.</p>
+            <button class="btn-primary" onclick="window.location.href='index.html'">Go to Login</button>
+        </div>
+
+        <div id="chatter-system" class="chatter-layout" style="display: none; width: 100%;">
+            <div class="server-sidebar">
+                <div class="server-icon discovery-btn" id="btn-discovery" onclick="openDiscovery()" title="Discover">🌍</div>
+                <hr style="width: 50%; border-color: var(--glass-border); margin: 10px 0;">
+                <div id="server-list"></div>
+                <div class="server-icon add-server-btn" onclick="createServer()" title="Add Server">+</div>
+            </div>
+
+            <div class="channel-sidebar">
+                <div class="sidebar-header">
+                    <h3 id="active-server-name">Discovery</h3>
+                    <button id="server-settings-btn" class="icon-btn" style="display:none;" onclick="openServerSettings()">⚙️</button>
+                </div>
+                <div id="channel-list" class="channel-list-container"></div>
+                <button id="add-channel-btn" class="btn-secondary" style="display:none; margin: 10px;" onclick="createChannel()">+ Add Channel</button>
+            </div>
+
+            <div class="chat-main">
+                <div class="chat-header">
+                    <h3 id="active-channel-name"># Welcome</h3>
+                </div>
+                <div id="discovery-box" class="discovery-grid" style="display: none; padding: 20px;"></div>
+                
+                <div id="chat-box" class="messages-container"></div>
+                
+                <form id="chat-form" class="chat-input-area" style="display:none;" onsubmit="submitChat(event)">
+                    <input type="text" id="chat-input" placeholder="Message this channel... (Use /ban <name> to ban)">
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <div id="server-settings-modal" class="custom-modal-overlay">
+        <div class="custom-modal-box">
+            <div class="custom-modal-content">
+                <h3 class="custom-modal-title">Server Settings</h3>
+                <div id="server-drop-zone" class="drop-zone">
+                    <img id="server-icon-preview" src="" alt="Server Icon" style="display:none; border-radius: 10px;">
+                    <span>Drop image to set server icon</span>
+                    <input type="file" id="server-file-input" accept="image/*" style="display:none;">
+                </div>
+                <div id="server-upload-status" class="status-text"></div>
+                
+                <hr style="border-color: var(--glass-border); margin: 20px 0;">
+                <h4 style="margin: 0 0 10px 0; text-align: left; color: white;">Server Bots <span class="bot-tag">APP</span></h4>
+                <div id="bot-list" style="text-align: left; max-height: 150px; overflow-y: auto;"></div>
+                <button class="btn-secondary" style="width: 100%; margin-top: 10px;" onclick="createBot()">+ Add Custom Bot</button>
+
+                <button class="custom-modal-btn cancel" style="margin-top: 15px; width: 100%;" onclick="document.getElementById('server-settings-modal').style.display='none'">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="custom-prompt" class="custom-modal-overlay">
+        <div class="custom-modal-box"><div class="custom-modal-content">
+            <h3 id="custom-prompt-title" class="custom-modal-title">Prompt</h3>
+            <p id="custom-prompt-desc" class="custom-modal-text"></p>
+            <input type="text" id="custom-prompt-input" class="custom-modal-input" autocomplete="off">
+            <div class="custom-modal-buttons">
+                <button id="custom-prompt-cancel" class="custom-modal-btn cancel">Cancel</button>
+                <button id="custom-prompt-confirm" class="custom-modal-btn confirm">Confirm</button>
+            </div>
+        </div></div>
+    </div>
+    <div id="custom-alert" class="custom-modal-overlay">
+        <div class="custom-modal-box"><div class="custom-modal-content">
+            <h3 class="custom-modal-title">CrimsonFlame</h3>
+            <p id="custom-alert-message" class="custom-modal-text"></p>
+            <button id="custom-alert-ok" class="custom-modal-btn confirm" style="width: 50%;">OK</button>
+        </div></div>
+    </div>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>
