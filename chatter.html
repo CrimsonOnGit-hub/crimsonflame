@@ -26,8 +26,8 @@
     <main style="display: flex; height: calc(100vh - 65px);">
         
         <div id="chatter-locked" class="card-container" style="margin: auto; width: 100%; max-width: 400px; text-align: center;">
-            <h2>Chatter Access Locked</h2><p>Please log in on the Hub.</p>
-            <button class="btn-primary" onclick="window.location.href='index.html'">Go to Login</button>
+            <h2>Chatter Access Locked</h2><p>Please log in to the Dashboard.</p>
+            <button class="btn-primary" onclick="window.location.href='dashboard.html'">Go to Dashboard</button>
         </div>
 
         <div id="chatter-system" class="chatter-layout" style="display: none; width: 100%;">
@@ -81,7 +81,7 @@
                     <div id="bot-list" style="text-align: left; max-height: 200px; overflow-y: auto;"></div>
                     
                     <button class="btn-primary" style="width: 100%; margin-top: 15px;" onclick="startVisualBotBuilder()">+ Open Visual Bot Builder</button>
-                    <button class="custom-modal-btn cancel" style="margin-top: 15px; width: 100%;" onclick="document.getElementById('server-settings-modal').style.display='none'">Close Settings</button>
+                    <button class="custom-modal-btn cancel" style="margin-top: 15px; width: 100%;" onclick="document.getElementById('server-settings-modal').classList.remove('active')">Close Settings</button>
                 </div>
 
                 <div id="bot-builder-ui" style="display:none; flex-direction:column; gap:10px;">
@@ -119,7 +119,7 @@
     </div>
     <div id="custom-alert" class="custom-modal-overlay">
         <div class="custom-modal-box"><div class="custom-modal-content">
-            <h3 class="custom-modal-title">CrimsonFlame</h3>
+            <h3 class="custom-modal-title">CrimsonFlame Alert</h3>
             <p id="custom-alert-message" class="custom-modal-text"></p>
             <button id="custom-alert-ok" class="custom-modal-btn confirm" style="width: 50%;">OK</button>
         </div></div>
