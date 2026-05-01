@@ -5,35 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CrimsonFlame Official</title>
     <link rel="stylesheet" href="style.css">
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js">idek</script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body style="overflow: hidden;">
 
     <svg style="position: absolute; pointer-events: none; width: 0; height: 0;" xmlns="http://www.w3.org/2000/svg" version="1.1">
-        <defs>
-            <filter id="goo">
-                <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur" />
-                <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 19 -9" result="goo" />
-                <feComposite in="SourceGraphic" in2="goo" operator="atop"/>
-            </filter>
-        </defs>
+        <defs><filter id="goo"><feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur" /><feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 19 -9" result="goo" /><feComposite in="SourceGraphic" in2="goo" operator="atop"/></filter></defs>
     </svg>
 
     <nav>
         <div class="nav-logo">CrimsonFlame</div>
         <div class="nav-links">
-            <div class="blob-container">
-                <div id="blob-main" class="nav-blob"></div> 
-                <div id="blob-trail" class="nav-blob"></div> 
-            </div>
-            
+            <div class="blob-container"><div id="blob-main" class="nav-blob"></div><div id="blob-trail" class="nav-blob"></div></div>
             <a href="#" onclick="routeTo('home')">Home</a>
             <a href="#" onclick="routeTo('updates')">Updates</a>
             <a href="#" onclick="routeTo('chatter')">Chatter</a>
-            <a href="dialog.html" style="color: #93c5fd; font-weight: bold; margin-left: 15px;"></a>
+            <a href="dialog.html" style="color: #93c5fd; font-weight: bold; margin-left: 15px;">Dialog (Call)</a>
             <a href="#" onclick="routeTo('tickets')">Support</a>
-            <a href="#" onclick="routeTo('terms')">Terms</a>
-            <a href="#" onclick="routeTo('privacy')">Privacy</a>
             <a href="#" onclick="routeTo('home')" id="nav-auth-link">Login</a>
         </div>
     </nav>
@@ -42,19 +30,7 @@
         <div id="page-home" class="page-content" style="display: block;">
             <div class="card-container" style="max-width: 800px;">
                 <h2>Welcome to CrimsonFlame</h2>
-                <p>Explore our latest updates and media below.</p>
-                <div id="home-gallery" style="display: flex; flex-direction: column; gap: 20px;">
-                    Loading media...
-                </div>
-
-                <div id="admin-home-editor" style="display: none; margin-top: 30px; padding: 20px; border: 2px dashed var(--crimson); border-radius: 8px; background: rgba(0,0,0,0.4);">
-                    <h3 style="color: var(--crimson); margin-top: 0;">Admin Tools: Publish to Homepage</h3>
-                    <div id="home-drop-zone" class="drop-zone" style="border-color: #555;">
-                        <span>Click or drop an image here to publish it live to the gallery</span>
-                        <input type="file" id="home-file-input" accept="image/*" style="display:none;">
-                    </div>
-                    <div id="home-upload-status" class="status-text"></div>
-                </div>
+                <div id="home-gallery" style="display: flex; flex-direction: column; gap: 20px;">Loading media...</div>
             </div>
 
             <div id="login-container" class="card-container">
@@ -64,12 +40,8 @@
                     <input type="password" id="password" placeholder="Password" required>
                     <button type="submit" class="btn-primary">Submit</button>
                 </form>
-                
                 <hr style="border-color: var(--glass-border); margin: 20px 0;">
-                <button type="button" class="btn-secondary" style="width: 100%; margin-bottom: 15px;" onclick="loginWithGoogle(event)">
-                    🌐 Continue with Google
-                </button>
-
+                <button type="button" class="btn-secondary" style="width: 100%; margin-bottom: 15px;" onclick="loginWithGoogle(event)">🌐 Continue with Google</button>
                 <p>Don't have an account? <a href="#" id="toggle-auth" onclick="toggleLoginMode()">Register here</a></p>
             </div>
 
@@ -78,96 +50,67 @@
                 <p>Logged in as: <strong id="user-display-email"></strong></p>
                 <button class="btn-danger" onclick="logOutUser()">Logout</button>
                 <hr style="border-color: var(--glass-border); margin: 20px 0;">
-                
-                <h3>Profile Settings</h3>
                 <form onsubmit="submitProfile(event)">
                     <div id="pfp-drop-zone" class="drop-zone">
                         <img id="dashboard-pfp-preview" src="https://cdn-icons-png.flaticon.com/512/149/149071.png" alt="PFP">
-                        <span>Click or drop image to change avatar</span>
+                        <span>Drop image to change avatar</span>
                         <input type="file" id="pfp-file-input" accept="image/*" style="display:none;">
                     </div>
                     <div id="upload-status" class="status-text"></div>
                     <input type="text" id="display-name" placeholder="Display Name">
                     <button type="submit" class="btn-primary">Save Profile Info</button>
                 </form>
-
-                <div id="admin-panel" style="display: none; margin-top: 20px; padding: 15px; border: 1px solid var(--crimson); border-radius: 8px; background: rgba(0,0,0,0.3);">
-                    <h3 style="color: var(--crimson);">Global Admin News Panel</h3>
-                    <form id="news-form" onsubmit="submitNews(event)">
-                        <input type="text" id="news-title" placeholder="Update Title" required>
-                        <textarea id="news-body" placeholder="Update details (Markdown supported)" rows="4" required></textarea>
-                        <button type="submit" class="btn-primary">Post Update</button>
-                    </form>
-                </div>
             </div>
         </div>
 
         <div id="page-updates" class="page-content">
             <div class="card-container" style="max-width: 800px;">
-                <h2>Platform Updates</h2>
-                <div id="news-feed">Loading updates...</div>
-            </div>
-        </div>
-
-        <div id="page-terms" class="page-content">
-            <div class="card-container" style="max-width: 800px;">
-                <h2>Terms of Service</h2>
-                <div id="terms-content">Loading terms...</div>
-            </div>
-        </div>
-
-        <div id="page-privacy" class="page-content">
-            <div class="card-container" style="max-width: 800px;">
-                <h2>Privacy Policy</h2>
-                <div id="privacy-content">Loading privacy policy...</div>
+                <h2>Platform Updates</h2><div id="news-feed"></div>
             </div>
         </div>
 
         <div id="page-chatter" class="page-content full-height">
             <div id="chatter-locked" class="card-container">
-                <h2>Chatter Access Locked</h2>
-                <p>You must be logged in to access the Chatter grid.</p>
+                <h2>Chatter Access Locked</h2><p>Please log in.</p>
                 <button class="btn-primary" onclick="routeTo('home')">Go to Login</button>
             </div>
 
             <div id="chatter-system" class="chatter-layout" style="display: none;">
                 <div class="server-sidebar">
-                    <div class="server-icon discovery-btn" id="btn-discovery" onclick="openDiscovery()" title="Discover Servers">🌍</div>
-                    <hr style="width: 50%; border-color: var(--glass-border); margin: 10px 0;">
+                    <div class="server-icon discovery-btn" id="btn-discovery" onclick="openDiscovery()" title="Discover">🌍</div>
+                    <div style="width: 32px; height: 2px; background: #35363c; margin-bottom: 8px; border-radius: 2px;"></div>
                     <div id="server-list"></div>
-                    <div class="server-icon add-server-btn" onclick="createServer()" title="Create Server">+</div>
+                    <div class="server-icon add-server-btn" onclick="createServer()" title="Add Server">+</div>
                 </div>
 
                 <div class="channel-sidebar">
                     <div class="sidebar-header">
                         <h3 id="active-server-name">Discovery</h3>
-                        <button id="server-settings-btn" class="icon-btn" style="display:none;" onclick="openServerSettings()">⚙️</button>
+                        <button id="server-settings-btn" class="icon-btn" style="display:none; color: var(--dc-text-muted);" onclick="openServerSettings()">⚙️</button>
                     </div>
                     <div id="channel-list" class="channel-list-container"></div>
-                    <button id="add-channel-btn" class="btn-secondary" style="display:none; margin: 10px;" onclick="createChannel()">+ Add Channel</button>
+                    <button id="add-channel-btn" class="btn-secondary" style="display:none; margin: 10px; background: #1e1f22; border:none;" onclick="createChannel()">+ Add Channel</button>
                 </div>
 
                 <div class="chat-main">
                     <div class="chat-header">
-                        <h3 id="active-channel-name">Discover Public Servers</h3>
+                        <h3 id="active-channel-name" style="color: #fff;"># Welcome</h3>
                     </div>
-                    <div class="chat-content">
-                        <div id="discovery-box" class="discovery-grid"></div>
-                        <div id="chat-box" class="messages-container" style="display:none;"></div>
-                    </div>
+                    <div id="discovery-box" class="discovery-grid" style="display: none; padding: 20px;"></div>
+                    
+                    <div id="chat-box" class="messages-container"></div>
+                    
                     <form id="chat-form" class="chat-input-area" style="display:none;" onsubmit="submitChat(event)">
-                        <input type="text" id="chat-input" placeholder="Message this channel... (Use /ban <name> to ban)">
+                        <div class="dc-input-wrapper">
+                            <span style="color: var(--dc-text-muted); font-size: 1.2rem; margin-right: 10px; cursor: pointer;">+</span>
+                            <input type="text" id="chat-input" placeholder="Message this channel...">
+                        </div>
                     </form>
                 </div>
             </div>
         </div>
 
         <div id="page-tickets" class="page-content">
-            <div id="ticket-locked" class="card-container">
-                <h2>Support Access Locked</h2>
-                <p>Please log in to submit or view support tickets.</p>
-            </div>
-
             <div id="ticket-system" class="card-container" style="display: none; max-width: 800px;">
                 <div id="list-view">
                     <h2>Support Center</h2>
@@ -176,28 +119,43 @@
                         <textarea id="ticket-msg" placeholder="Describe the issue in detail..." rows="4" required></textarea>
                         <button type="submit" class="btn-primary">Create Ticket</button>
                     </form>
-                    <h3 style="margin-top: 30px;">Your Tickets</h3>
                     <div id="ticket-list"></div>
                 </div>
-
                 <div id="thread-view" style="display: none;">
                     <button class="btn-secondary" onclick="closeThreadView()">← Back to List</button>
                     <h2 id="active-subject">Ticket Subject</h2>
-                    <div id="ticket-chat-box" class="messages-container" style="height: 300px; background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border); border-radius: 8px; margin-bottom: 10px;"></div>
+                    <div id="ticket-chat-box" class="messages-container" style="height: 300px; background: rgba(0,0,0,0.2); border-radius: 8px;"></div>
                     <form id="ticket-chat-form" onsubmit="submitTicketChat(event)" style="display: flex; gap: 10px;">
                         <input type="text" id="ticket-chat-input" placeholder="Type a reply..." style="flex: 1; margin-bottom: 0;" required>
                         <button type="submit" class="btn-primary" style="width: auto;">Reply</button>
                     </form>
-                    <div id="admin-close-area" style="display: none; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--glass-border);">
-                        <button class="btn-danger" style="width: 100%;" onclick="closeActiveTicket()">Close Ticket</button>
-                    </div>
-                    <div id="resolution-box" style="display: none; margin-top: 20px; padding: 15px; background: rgba(0,0,0,0.3); border-radius: 8px; border-left: 4px solid var(--crimson);">
-                        <strong>Ticket Closed:</strong> <span id="resolution-text"></span>
-                    </div>
+                    <div id="admin-close-area" style="display: none; margin-top: 20px;"><button class="btn-danger" style="width: 100%;" onclick="closeActiveTicket()">Close Ticket</button></div>
+                    <div id="resolution-box" style="display: none; margin-top: 20px; border-left: 4px solid var(--crimson);"><strong>Ticket Closed:</strong> <span id="resolution-text"></span></div>
                 </div>
             </div>
         </div>
     </main>
+
+    <div id="server-settings-modal" class="custom-modal-overlay">
+        <div class="custom-modal-box">
+            <div class="custom-modal-content">
+                <h3 class="custom-modal-title">Server Settings</h3>
+                <div id="server-drop-zone" class="drop-zone">
+                    <img id="server-icon-preview" src="" alt="Server Icon" style="display:none; border-radius: 10px;">
+                    <span>Drop image to set server icon</span>
+                    <input type="file" id="server-file-input" accept="image/*" style="display:none;">
+                </div>
+                <div id="server-upload-status" class="status-text"></div>
+                
+                <hr style="border-color: var(--glass-border); margin: 20px 0;">
+                <h4 style="margin: 0 0 10px 0; text-align: left;">Server Bots <span class="bot-tag">APP</span></h4>
+                <div id="bot-list" style="text-align: left; max-height: 150px; overflow-y: auto;"></div>
+                <button class="btn-secondary" style="width: 100%; margin-top: 10px;" onclick="createBot()">+ Add Custom Bot</button>
+
+                <button class="custom-modal-btn cancel" style="margin-top: 15px; width: 100%;" onclick="document.getElementById('server-settings-modal').style.display='none'">Close</button>
+            </div>
+        </div>
+    </div>
 
     <div id="custom-prompt" class="custom-modal-overlay">
         <div class="custom-modal-box">
