@@ -17,6 +17,7 @@
         <div class="nav-links">
             <a href="index.html">← Back to Hub</a>
             <a href="dialog.html" style="color: #93c5fd; font-weight: bold; margin-left: 15px;">Dialog (Call)</a>
+            <a href="support.html">Support</a>
         </div>
     </nav>
 
@@ -53,7 +54,7 @@
                 <div id="chat-box" class="messages-container"></div>
                 
                 <form id="chat-form" class="chat-input-area" style="display:none;" onsubmit="submitChat(event)">
-                    <input type="text" id="chat-input" placeholder="Message this channel... (Use /ban <name> to ban)">
+                    <input type="text" id="chat-input" placeholder="Message this channel...">
                 </form>
             </div>
         </div>
@@ -71,9 +72,15 @@
                 <div id="server-upload-status" class="status-text"></div>
                 
                 <hr style="border-color: var(--glass-border); margin: 20px 0;">
+                
                 <h4 style="margin: 0 0 10px 0; text-align: left; color: white;">Server Bots <span class="bot-tag">APP</span></h4>
-                <div id="bot-list" style="text-align: left; max-height: 150px; overflow-y: auto;"></div>
-                <button class="btn-secondary" style="width: 100%; margin-top: 10px;" onclick="createBot()">+ Add Custom Bot</button>
+                <div id="bot-list" style="text-align: left; max-height: 200px; overflow-y: auto;"></div>
+                
+                <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; margin-top: 10px; border: 1px solid var(--glass-border);">
+                    <input type="text" id="botName" placeholder="Bot Name..." style="margin-bottom: 5px;">
+                    <textarea id="flowchart-logic" placeholder="Write flowchart logic... E.g., @user said 'hello' --> execute action: reply 'grid sync complete'" rows="4"></textarea>
+                    <button class="btn-primary" style="margin-top: 10px;" onclick="window.submitBotFlowchart()">+ Submit Bot Flowchart</button>
+                </div>
 
                 <button class="custom-modal-btn cancel" style="margin-top: 15px; width: 100%;" onclick="document.getElementById('server-settings-modal').style.display='none'">Close</button>
             </div>
