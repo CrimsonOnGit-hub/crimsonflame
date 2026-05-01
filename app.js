@@ -104,7 +104,13 @@ window.submitLogin = async function(e) {
                 await sendEmailVerification(userCredential.user);
                 await signOut(auth);
                 showResponseText(btn, 'error', "Email not verified. A new link has been sent.");
-            } else { window.routeTo('home'); }
+            } else { 
+                // BUG FIX: Route to the dash, since login is its own page
+                if(document.getElementById('dashboard-container')) {
+                    document.getElementById('login-container').style.display = 'none';
+                    document.getElementById('dashboard-container').style.display = 'block';
+                } else { window.location.href = 'dashboard.html'; }
+            }
         } else {
             const userCredential = await createUserWithEmailAndPassword(auth, document.getElementById('email').value, document.getElementById('password').value);
             await sendEmailVerification(userCredential.user);
@@ -117,7 +123,13 @@ window.submitLogin = async function(e) {
 
 window.loginWithGoogle = async function(e) {
     e.preventDefault();
-    try { await signInWithPopup(auth, googleProvider); window.routeTo('home'); } 
+    try { 
+        await signInWithPopup(auth, googleProvider); 
+        if(document.getElementById('dashboard-container')) {
+            document.getElementById('login-container').style.display = 'none';
+            document.getElementById('dashboard-container').style.display = 'block';
+        } else { window.location.href = 'dashboard.html'; }
+    } 
     catch (err) { window.showCustomAlert("Google Login Error: " + err.message); }
 };
 
@@ -133,7 +145,7 @@ window.submitProfile = async function(e) {
     }
 };
 
-window.logOutUser = function() { signOut(auth); window.routeTo('home'); };
+window.logOutUser = function() { signOut(auth); window.location.href = 'index.html'; };
 window.toggleLoginMode = function() {
     isLogin = !isLogin;
     document.getElementById('auth-title').innerText = isLogin ? "Account Login" : "Register Account";
@@ -317,7 +329,6 @@ window.addBotNode = function(type) {
         const html = `<div><div class="title-box">📤 Action Node</div><input type="text" df-reply placeholder="Bot will reply..."></div>`;
         window.botEditor.addNode('action', 1, 0, 350, 50, 'action', { reply: '' }, html);
     } else if (type === 'code') {
-        // NEW WEBHOOK CODE NODE
         const html = `<div><div class="title-box">⚙️ Code Webhook</div><input type="text" df-url placeholder="Target URL (https://...)"><input type="text" df-code placeholder="Code payload..."></div>`;
         window.botEditor.addNode('code', 1, 0, 350, 200, 'code', { url: '', code: '' }, html);
     }
@@ -396,7 +407,6 @@ window.submitChat = async function(e) {
         const msgRef = collection(db, "discord_servers", activeServerId, "channels", activeChannelId, "messages");
         await addDoc(msgRef, msgData);
 
-        // PARSE THE VISUAL DRAWFLOW GRAPH FOR BOTS
         if (activeServerData && activeServerData.bots) {
             activeServerData.bots.forEach(bot => {
                 if (bot.graph && bot.graph.drawflow && bot.graph.drawflow.Home && bot.graph.drawflow.Home.data) {
@@ -411,7 +421,6 @@ window.submitChat = async function(e) {
                                 connections.forEach(conn => {
                                     const nextNode = nodes[conn.node];
                                     
-                                    // Handle Text Reply Node
                                     if (nextNode && nextNode.name === 'action') {
                                         const reply = nextNode.data.reply;
                                         if (reply) {
@@ -424,7 +433,6 @@ window.submitChat = async function(e) {
                                             }, 600);
                                         }
                                     } 
-                                    // Handle HTTP Webhook Node
                                     else if (nextNode && nextNode.name === 'code') {
                                         const targetUrl = nextNode.data.url;
                                         const codePayload = nextNode.data.code;
@@ -432,7 +440,6 @@ window.submitChat = async function(e) {
                                         if (targetUrl && codePayload) {
                                             const payloadStr = `chatter-bot-code-${codePayload}`;
                                             
-                                            // 1. Fire Webhook POST request silently in the background
                                             try {
                                                 fetch(targetUrl, {
                                                     method: 'POST',
@@ -441,7 +448,6 @@ window.submitChat = async function(e) {
                                                 }).catch(err => console.warn("Webhook fetch blocked or failed:", err));
                                             } catch(err) { console.error(err); }
 
-                                            // 2. Post a confirmation into the chat
                                             setTimeout(async () => {
                                                 await addDoc(msgRef, {
                                                     text: `[SYSTEM WEBHOOK FIRED]: ${payloadStr}`, 
@@ -542,6 +548,42 @@ window.selectServer = function(serverId, serverData, element) {
     });
 };
 
+window.openServerSettings = async function() {
+    const modal = document.getElementById('server-settings-modal');
+    if(!modal) return;
+    
+    document.getElementById('server-settings-main-view').style.display = 'block';
+    document.getElementById('bot-builder-ui').style.display = 'none';
+    
+    // BUG FIX: Settings Modal now toggles via classList.add('active') properly
+    modal.classList.add('active');
+
+    const serverSnap = await getDoc(doc(db, "discord_servers", activeServerId));
+    activeServerData = serverSnap.data();
+    
+    const url = activeServerData.photoURL || "";
+    const preview = document.getElementById('server-icon-preview');
+    if(preview) { preview.src = url; preview.style.display = url ? 'block' : 'none'; }
+    window.renderBotList();
+};
+
+window.createServer = async function() {
+    if(!currentUser) return;
+    window.showCustomPrompt("Create Server", "Enter a name for your new server:", "Server Name...", async (name) => {
+        const newServer = await addDoc(collection(db, "discord_servers"), { 
+            name: name, owner: currentUser.uid, members: [currentUser.uid], admins: [currentUser.uid], bots: [], timestamp: serverTimestamp()
+        });
+        await addDoc(collection(db, "discord_servers", newServer.id, "channels"), { name: "general", timestamp: serverTimestamp() });
+    });
+};
+
+window.createChannel = async function() {
+    if(!activeServerId) return;
+    window.showCustomPrompt("Add Channel", "Enter the new channel name:", "Channel Name...", async (name) => {
+        await addDoc(collection(db, "discord_servers", activeServerId, "channels"), { name: name.toLowerCase().replace(/\s+/g, '-'), timestamp: serverTimestamp() });
+    });
+};
+
 window.openDiscovery = async function() {
     document.querySelectorAll('.server-icon').forEach(el => el.classList.remove('active'));
     document.getElementById('btn-discovery').classList.add('active');
@@ -620,29 +662,37 @@ window.routeTo = function(page) {
 };
 
 onAuthStateChanged(auth, user => {
+    const navAuth = document.getElementById('nav-auth-link');
+    const loginC = document.getElementById('login-container');
+    const dashC = document.getElementById('dashboard-container');
+    const chatLock = document.getElementById('chatter-locked');
+    const chatSys = document.getElementById('chatter-system');
+    const supLock = document.getElementById('support-locked');
+    const supSys = document.getElementById('page-support');
+    const adminPanel = document.getElementById('admin-panel');
+    const adminHome = document.getElementById('admin-home-editor');
+
     if(user && (user.emailVerified || user.providerData.some(p => p.providerId === 'google.com'))) {
         currentUser = user;
         isGlobalAdmin = (user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase());
 
-        const navAuth = document.getElementById('nav-auth-link');
         if(navAuth) navAuth.innerText = "Dashboard";
         
-        const loginC = document.getElementById('login-container'); if(loginC) loginC.style.display = 'none';
-        const dashC = document.getElementById('dashboard-container'); if(dashC) dashC.style.display = 'block';
+        if(loginC) loginC.style.display = 'none';
+        if(dashC) dashC.style.display = 'block';
         
-        const chatLock = document.getElementById('chatter-locked'); if(chatLock) chatLock.style.display = 'none';
-        const chatSys = document.getElementById('chatter-system'); 
+        if(chatLock) chatLock.style.display = 'none';
         if(chatSys) { chatSys.style.display = 'flex'; window.initChatter(); }
 
-        const supLock = document.getElementById('support-locked'); if(supLock) supLock.style.display = 'none';
-        const supSys = document.getElementById('page-support'); if(supSys) { supSys.style.display = 'block'; window.fetchTickets(); }
+        if(supLock) supLock.style.display = 'none';
+        if(supSys) { supSys.style.display = 'block'; window.fetchTickets(); }
 
         const emailEl = document.getElementById('user-display-email'); if(emailEl) emailEl.innerText = user.email;
         const nameEl = document.getElementById('display-name'); if(nameEl) nameEl.value = user.displayName || "";
         const pfpEl = document.getElementById('dashboard-pfp-preview'); if(pfpEl) pfpEl.src = user.photoURL || DEFAULT_PFP;
 
-        const adminPanel = document.getElementById('admin-panel'); if(adminPanel) adminPanel.style.display = isGlobalAdmin ? 'block' : 'none';
-        const adminHome = document.getElementById('admin-home-editor'); if(adminHome) adminHome.style.display = isGlobalAdmin ? 'block' : 'none';
+        if(adminPanel) adminPanel.style.display = isGlobalAdmin ? 'block' : 'none';
+        if(adminHome) adminHome.style.display = isGlobalAdmin ? 'block' : 'none';
         
         setDoc(doc(db, "users", currentUser.uid), {
             uid: currentUser.uid,
@@ -652,21 +702,23 @@ onAuthStateChanged(auth, user => {
 
     } else {
         currentUser = null; isGlobalAdmin = false;
+        if(navAuth) navAuth.innerText = "Login";
         
-        const loginC = document.getElementById('login-container'); if(loginC) loginC.style.display = 'block';
-        const dashC = document.getElementById('dashboard-container'); if(dashC) dashC.style.display = 'none';
+        if(loginC) loginC.style.display = 'block';
+        if(dashC) dashC.style.display = 'none';
         
-        const chatLock = document.getElementById('chatter-locked'); if(chatLock) chatLock.style.display = 'block';
-        const chatSys = document.getElementById('chatter-system'); if(chatSys) chatSys.style.display = 'none';
+        if(chatLock) chatLock.style.display = 'block';
+        if(chatSys) chatSys.style.display = 'none';
         
-        const supLock = document.getElementById('support-locked'); if(supLock) supLock.style.display = 'block';
-        const supSys = document.getElementById('page-support'); if(supSys) supSys.style.display = 'none';
+        if(supLock) supLock.style.display = 'block';
+        if(supSys) supSys.style.display = 'none';
 
-        const adminPanel = document.getElementById('admin-panel'); if(adminPanel) adminPanel.style.display = 'none';
-        const adminHome = document.getElementById('admin-home-editor'); if(adminHome) adminHome.style.display = 'none';
+        if(adminPanel) adminPanel.style.display = 'none';
+        if(adminHome) adminHome.style.display = 'none';
     }
 });
 
+// --- DRAG AND DROP UPLOADS ---
 const pfpDropZone = document.getElementById('pfp-drop-zone');
 const pfpFileInput = document.getElementById('pfp-file-input');
 if(pfpDropZone && pfpFileInput) {
