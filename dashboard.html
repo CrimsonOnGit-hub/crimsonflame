@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard | CrimsonFlame</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body style="overflow: hidden;">
+
+    <svg style="position: absolute; pointer-events: none; width: 0; height: 0;" xmlns="http://www.w3.org/2000/svg" version="1.1">
+        <defs><filter id="goo"><feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur" /><feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 19 -9" result="goo" /><feComposite in="SourceGraphic" in2="goo" operator="atop"/></filter></defs>
+    </svg>
+
+    <nav>
+        <div class="nav-logo">CrimsonFlame <span style="color:var(--text-muted); font-size:1rem;">| Dash</span></div>
+        <div class="nav-links">
+            <a href="index.html">← Back to Hub</a>
+            <a href="chatter.html">Chatter</a>
+            <a href="dialog.html" style="color: #93c5fd; font-weight: bold;">Dialog (Call)</a>
+        </div>
+    </nav>
+
+    <main id="main-content" style="display: flex; justify-content: center; align-items: start; padding-top: 40px;">
+        
+        <div id="login-container" class="card-container" style="width: 100%; max-width: 500px;">
+            <h2 id="auth-title">Account Login</h2>
+            <form onsubmit="submitLogin(event)">
+                <input type="email" id="email" placeholder="Email Address" required>
+                <input type="password" id="password" placeholder="Password" required>
+                <button type="submit" class="btn-primary">Submit</button>
+            </form>
+            <hr style="border-color: var(--glass-border); margin: 20px 0;">
+            
+            <button type="button" class="btn-google-sign-in" onclick="loginWithGoogle(event)">
+                <img src="https://cdn-icons-png.flaticon.com/512/300/300221.png" alt="Google G">
+                Continue with Google
+            </button>
+            
+            <p>Don't have an account? <a href="#" id="toggle-auth" onclick="toggleLoginMode()">Register here</a></p>
+        </div>
+
+        <div id="dashboard-container" class="card-container" style="display: none; width: 100%; max-width: 500px;">
+            <h2>Dashboard</h2>
+            <p>Status: <strong style="color:var(--crimson)">Syncing with Grid...</strong></p>
+            <div style="display:flex; align-items:center; gap: 10px; margin: 15px 0;">
+                <img id="dashboard-pfp-preview" src="https://cdn-icons-png.flaticon.com/512/149/149071.png" alt="PFP" style="width: 50px; height: 50px; border-radius: 50%;">
+                <p>Logged in as: <strong id="user-display-email"></strong></p>
+            </div>
+            <button class="btn-danger" onclick="logOutUser()">Logout</button>
+            
+            <hr style="border-color: var(--glass-border); margin: 20px 0;">
+            
+            <form onsubmit="submitProfile(event)">
+                <div id="pfp-drop-zone" class="drop-zone">
+                    <span>Drop image to change avatar</span>
+                    <input type="file" id="pfp-file-input" accept="image/*" style="display:none;">
+                </div>
+                <div id="upload-status" class="status-text"></div>
+                <input type="text" id="display-name" placeholder="Display Name">
+                <button type="submit" class="btn-primary">Save Profile Info</button>
+            </form>
+        </div>
+
+    </main>
+
+    <div id="custom-prompt" class="custom-modal-overlay">
+        <div class="custom-modal-box"><div class="custom-modal-content">
+            <h3 id="custom-prompt-title" class="custom-modal-title">Prompt</h3>
+            <p id="custom-prompt-desc" class="custom-modal-text"></p>
+            <input type="text" id="custom-prompt-input" class="custom-modal-input" autocomplete="off">
+            <div class="custom-modal-buttons">
+                <button id="custom-prompt-cancel" class="custom-modal-btn cancel">Cancel</button>
+                <button id="custom-prompt-confirm" class="custom-modal-btn confirm">Confirm</button>
+            </div>
+        </div></div>
+    </div>
+    <div id="custom-alert" class="custom-modal-overlay">
+        <div class="custom-modal-box"><div class="custom-modal-content">
+            <h3 class="custom-modal-title">CrimsonFlame Alert</h3>
+            <p id="custom-alert-message" class="custom-modal-text"></p>
+            <button id="custom-alert-ok" class="custom-modal-btn confirm" style="width: 50%;">OK</button>
+        </div></div>
+    </div>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>
