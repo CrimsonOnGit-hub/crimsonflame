@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chatter | CrimsonFlame</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jerosoler/Drawflow/dist/drawflow.min.css">
+    <script src="https://cdn.jsdelivr.net/gh/jerosoler/Drawflow/dist/drawflow.min.js"></script>
 </head>
 <body style="overflow: hidden;">
 
@@ -61,28 +63,43 @@
     </main>
 
     <div id="server-settings-modal" class="custom-modal-overlay">
-        <div class="custom-modal-box">
-            <div class="custom-modal-content">
+        <div class="custom-modal-box" style="max-width: 700px; width: 95%;"> <div class="custom-modal-content" style="max-height: 80vh; overflow-y: auto;">
                 <h3 class="custom-modal-title">Server Settings</h3>
-                <div id="server-drop-zone" class="drop-zone">
-                    <img id="server-icon-preview" src="" alt="Server Icon" style="display:none; border-radius: 10px;">
-                    <span>Drop image to set server icon</span>
-                    <input type="file" id="server-file-input" accept="image/*" style="display:none;">
-                </div>
-                <div id="server-upload-status" class="status-text"></div>
                 
-                <hr style="border-color: var(--glass-border); margin: 20px 0;">
-                
-                <h4 style="margin: 0 0 10px 0; text-align: left; color: white;">Server Bots <span class="bot-tag">APP</span></h4>
-                <div id="bot-list" style="text-align: left; max-height: 200px; overflow-y: auto;"></div>
-                
-                <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; margin-top: 10px; border: 1px solid var(--glass-border);">
-                    <input type="text" id="botName" placeholder="Bot Name..." style="margin-bottom: 5px;">
-                    <textarea id="flowchart-logic" placeholder="Write flowchart logic... E.g., @user said 'hello' --> execute action: reply 'grid sync complete'" rows="4"></textarea>
-                    <button class="btn-primary" style="margin-top: 10px;" onclick="window.submitBotFlowchart()">+ Submit Bot Flowchart</button>
+                <div id="server-settings-main-view">
+                    <div id="server-drop-zone" class="drop-zone">
+                        <img id="server-icon-preview" src="" alt="Server Icon" style="display:none; border-radius: 10px;">
+                        <span>Drop image to set server icon</span>
+                        <input type="file" id="server-file-input" accept="image/*" style="display:none;">
+                    </div>
+                    <div id="server-upload-status" class="status-text"></div>
+                    
+                    <hr style="border-color: var(--glass-border); margin: 20px 0;">
+                    
+                    <h4 style="margin: 0 0 10px 0; text-align: left; color: white;">Server Bots <span class="bot-tag">APP</span></h4>
+                    <div id="bot-list" style="text-align: left; max-height: 200px; overflow-y: auto;"></div>
+                    
+                    <button class="btn-primary" style="width: 100%; margin-top: 15px;" onclick="startVisualBotBuilder()">+ Open Visual Bot Builder</button>
+                    <button class="custom-modal-btn cancel" style="margin-top: 15px; width: 100%;" onclick="document.getElementById('server-settings-modal').style.display='none'">Close Settings</button>
                 </div>
 
-                <button class="custom-modal-btn cancel" style="margin-top: 15px; width: 100%;" onclick="document.getElementById('server-settings-modal').style.display='none'">Close</button>
+                <div id="bot-builder-ui" style="display:none; flex-direction:column; gap:10px;">
+                    <h4 style="color: var(--crimson); margin: 0;">Visual Bot Constructor</h4>
+                    <input type="text" id="botName" placeholder="Bot Name..." class="custom-modal-input" style="margin-bottom: 5px;">
+                    
+                    <div style="display:flex; gap:10px; margin-bottom: 10px;">
+                        <button class="btn-secondary" style="flex:1;" onclick="addBotNode('trigger')">📥 Add Trigger (Hear)</button>
+                        <button class="btn-secondary" style="flex:1;" onclick="addBotNode('action')">📤 Add Action (Reply)</button>
+                    </div>
+
+                    <div id="drawflow-container" style="width: 100%; height: 350px; background: rgba(0,0,0,0.6); border-radius: 8px; border: 1px solid var(--glass-border); position: relative; text-align: left;"></div>
+                    
+                    <div style="display:flex; gap:10px; margin-top: 15px;">
+                        <button class="btn-danger" style="flex:1;" onclick="cancelBotBuild()">Cancel</button>
+                        <button class="btn-primary" style="flex:2;" onclick="saveVisualBot()">Save Bot Node Logic</button>
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>
