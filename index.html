@@ -24,7 +24,7 @@
             <a href="support.html">Support</a>
             <a href="#" onclick="routeTo('terms')">Terms</a>
             <a href="#" onclick="routeTo('privacy')">Privacy</a>
-            <a href="#" onclick="routeTo('home')" id="nav-auth-link">Login</a>
+            <a href="dashboard.html" id="nav-auth-link">Login</a>
         </div>
     </nav>
 
@@ -33,45 +33,6 @@
             <div class="card-container" style="max-width: 800px;">
                 <h2>Welcome to CrimsonFlame</h2>
                 <div id="home-gallery" style="display: flex; flex-direction: column; gap: 20px;">Loading media...</div>
-            </div>
-
-            <div id="login-container" class="card-container">
-                <h2 id="auth-title">Account Login</h2>
-                <form onsubmit="submitLogin(event)">
-                    <input type="email" id="email" placeholder="Email Address" required>
-                    <input type="password" id="password" placeholder="Password" required>
-                    <button type="submit" class="btn-primary">Submit</button>
-                </form>
-                <hr style="border-color: var(--glass-border); margin: 20px 0;">
-                
-                <button type="button" class="btn-google-sign-in" onclick="loginWithGoogle(event)">
-                    <img src="https://cdn-icons-png.flaticon.com/512/300/300221.png" alt="Google G">
-                    Continue with Google
-                </button>
-                
-                <p>Don't have an account? <a href="#" id="toggle-auth" onclick="toggleLoginMode()">Register here</a></p>
-            </div>
-
-            <div id="dashboard-container" class="card-container" style="display: none;">
-                <h2>Dashboard</h2>
-                <p>Status: <strong style="color:var(--crimson)">Syncing with Grid...</strong></p>
-                <div style="display:flex; align-items:center; gap: 10px; margin: 15px 0;">
-                    <img id="dashboard-pfp-preview" src="https://cdn-icons-png.flaticon.com/512/149/149071.png" alt="PFP" style="width: 50px; height: 50px; border-radius: 50%;">
-                    <p>Logged in as: <strong id="user-display-email"></strong></p>
-                </div>
-                <button class="btn-danger" onclick="logOutUser()">Logout</button>
-                
-                <hr style="border-color: var(--glass-border); margin: 20px 0;">
-                
-                <form onsubmit="submitProfile(event)">
-                    <div id="pfp-drop-zone" class="drop-zone">
-                        <span>Drop image to change avatar</span>
-                        <input type="file" id="pfp-file-input" accept="image/*" style="display:none;">
-                    </div>
-                    <div id="upload-status" class="status-text"></div>
-                    <input type="text" id="display-name" placeholder="Display Name">
-                    <button type="submit" class="btn-primary">Save Profile Info</button>
-                </form>
             </div>
         </div>
 
