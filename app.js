@@ -11,6 +11,7 @@ const firebaseConfig = {
     appId: "1:406321213530:web:92d27a69d34d147393a863"
 };
 
+const ADMIN_EMAIL = "allaboutwaterdiamond@gmail.com";
 const DEFAULT_PFP = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
 const IMGBB_API_KEY = "d5fd4e3e9fedc18b9bed075f980f12b7"; 
 
@@ -25,6 +26,8 @@ let activeServerData = null;
 let activeChannelId = null;
 let activeChatType = 'server'; 
 let activeDmId = null;
+let currentUser = null;
+let isGlobalAdmin = false; 
 
 let chatterServersUnsub = null;
 let chatterChannelsUnsub = null;
@@ -33,45 +36,38 @@ let ticketChatUnsubscribe = null;
 let activeTicketId = null;
 let isLogin = true;
 
+// --- CUSTOM LIQUID MODALS GLOBALS ---
 window.showCustomPrompt = function(title, desc, placeholder, onConfirm) {
     const overlay = document.getElementById('custom-prompt');
+    if(!overlay) return;
     const input = document.getElementById('custom-prompt-input');
-    const cancelBtn = document.getElementById('custom-prompt-cancel');
-    const confirmBtn = document.getElementById('custom-prompt-confirm');
-
     document.getElementById('custom-prompt-title').innerText = title;
     document.getElementById('custom-prompt-desc').innerText = desc;
-    input.style.display = 'block';
-    input.placeholder = placeholder;
-    input.value = "";
-    overlay.classList.add('active');
-    input.focus();
+    input.style.display = 'block'; input.placeholder = placeholder; input.value = "";
+    overlay.classList.add('active'); input.focus();
 
-    cancelBtn.onclick = () => overlay.classList.remove('active');
-    const submitAction = () => {
-        if(input.value.trim() !== "") { overlay.classList.remove('active'); onConfirm(input.value.trim()); }
-    };
-    confirmBtn.onclick = submitAction;
+    document.getElementById('custom-prompt-cancel').onclick = () => overlay.classList.remove('active');
+    const submitAction = () => { if(input.value.trim() !== "") { overlay.classList.remove('active'); onConfirm(input.value.trim()); } };
+    document.getElementById('custom-prompt-confirm').onclick = submitAction;
     input.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); submitAction(); } };
 };
 
 window.showCustomConfirm = function(title, desc, onConfirm) {
     const overlay = document.getElementById('custom-prompt');
+    if(!overlay) return;
     const input = document.getElementById('custom-prompt-input');
-    const cancelBtn = document.getElementById('custom-prompt-cancel');
-    const confirmBtn = document.getElementById('custom-prompt-confirm');
-
     document.getElementById('custom-prompt-title').innerText = title;
     document.getElementById('custom-prompt-desc').innerText = desc;
     input.style.display = 'none'; 
     overlay.classList.add('active');
 
-    cancelBtn.onclick = () => { overlay.classList.remove('active'); input.style.display = 'block'; };
-    confirmBtn.onclick = () => { overlay.classList.remove('active'); input.style.display = 'block'; onConfirm(); };
+    document.getElementById('custom-prompt-cancel').onclick = () => { overlay.classList.remove('active'); input.style.display = 'block'; };
+    document.getElementById('custom-prompt-confirm').onclick = () => { overlay.classList.remove('active'); input.style.display = 'block'; onConfirm(); };
 };
 
 window.showCustomAlert = function(message) {
     const overlay = document.getElementById('custom-alert');
+    if(!overlay) { alert(message); return; } // Fallback if missing
     document.getElementById('custom-alert-message').innerText = message;
     overlay.classList.add('active');
     document.getElementById('custom-alert-ok').onclick = () => overlay.classList.remove('active');
@@ -79,36 +75,64 @@ window.showCustomAlert = function(message) {
 
 function formatDiscordTime(timestamp) {
     if(!timestamp) return 'Just now';
-    const d = timestamp.toDate();
-    return d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    return timestamp.toDate().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
 }
 
+function showResponseText(element, type, text) {
+    const statusDiv = document.createElement('div');
+    statusDiv.className = `status-text ${type}`;
+    statusDiv.innerText = text;
+    statusDiv.style.display = 'block';
+    statusDiv.style.marginTop = '10px';
+    statusDiv.style.textAlign = 'center';
+    element.parentNode.insertBefore(statusDiv, element.nextSibling);
+    setTimeout(() => { statusDiv.remove(); }, 5000); 
+}
+
+// --- AUTH LOGIC ---
 window.submitLogin = async function(e) {
     e.preventDefault();
     const btn = e.target.querySelector('button[type="submit"]');
-    btn.disabled = true;
+    btn.disabled = true; btn.innerText = "Processing...";
     try {
         if(isLogin) {
             const userCredential = await signInWithEmailAndPassword(auth, document.getElementById('email').value, document.getElementById('password').value);
             if (!userCredential.user.emailVerified) {
                 await sendEmailVerification(userCredential.user);
                 await signOut(auth);
-                window.showCustomAlert("Email not verified. A new link has been sent.");
+                showResponseText(btn, 'error', "Email not verified. A new link has been sent.");
             } else { window.routeTo('home'); }
         } else {
             const userCredential = await createUserWithEmailAndPassword(auth, document.getElementById('email').value, document.getElementById('password').value);
             await sendEmailVerification(userCredential.user);
             await signOut(auth);
-            window.showCustomAlert("Account created! Check your inbox.");
+            showResponseText(btn, 'success', "Account created! Check your inbox.");
             window.toggleLoginMode();
         }
-    } catch (err) { window.showCustomAlert(`Error: ${err.message}`); } finally { btn.disabled = false; }
+    } catch (err) { showResponseText(btn, 'error', `Error: ${err.message}`); } finally { btn.disabled = false; btn.innerText = "Submit"; }
 };
 
 window.loginWithGoogle = async function(e) {
     e.preventDefault();
     try { await signInWithPopup(auth, googleProvider); window.routeTo('home'); } 
     catch (err) { window.showCustomAlert("Google Login Error: " + err.message); }
+};
+
+window.submitProfile = async function(e) {
+    e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    const newName = document.getElementById('display-name').value;
+    const newPfp = document.getElementById('dashboard-pfp-preview').src;
+    if (auth.currentUser) {
+        await updateProfile(auth.currentUser, { displayName: newName, photoURL: newPfp });
+        showResponseText(btn, 'success', "Profile Saved Successfully!");
+        
+        // Also update the global users collection
+        await setDoc(doc(db, "users", auth.currentUser.uid), {
+            displayName: newName,
+            photoURL: newPfp
+        }, { merge: true });
+    }
 };
 
 window.logOutUser = function() { signOut(auth); window.routeTo('home'); };
@@ -118,28 +142,76 @@ window.toggleLoginMode = function() {
     document.getElementById('toggle-auth').innerText = isLogin ? "Register here" : "Login here";
 };
 
-// --- CHAT & BOT ENGINE ---
+// --- DATA FETCHING ---
+window.fetchHomeImages = async function() {
+    const gallery = document.getElementById('home-gallery');
+    if(!gallery) return;
+    try {
+        const snap = await getDocs(query(collection(db, "home_images"), orderBy("timestamp", "desc")));
+        gallery.innerHTML = "";
+        if(snap.empty) { gallery.innerHTML = "<p style='color:#aaa;'>No media published yet.</p>"; return; }
+        snap.forEach(d => { gallery.innerHTML += `<img src="${d.data().url}" alt="Homepage Image">`; });
+    } catch(err) { gallery.innerHTML = `<p style="color:var(--crimson);">Error loading gallery.</p>`; }
+};
 
+window.fetchNews = async function() {
+    const feed = document.getElementById('news-feed');
+    if(!feed) return;
+    try {
+        const snap = await getDocs(query(collection(db, "news"), orderBy("timestamp", "desc")));
+        feed.innerHTML = "";
+        if(snap.empty) { feed.innerHTML = "<p style='color:#aaa;'>No updates posted yet.</p>"; return; }
+        snap.forEach(d => {
+            const data = d.data();
+            feed.innerHTML += `<div class="news-card"><small style="color:var(--crimson);">${data.date}</small><h3 style="margin:5px 0;">${data.title}</h3><div>${marked.parse(data.body)}</div></div>`;
+        });
+    } catch(e) { feed.innerHTML = `<p style="color:var(--crimson);">Error fetching updates.</p>`; }
+};
+
+window.submitNews = async function(e) {
+    e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    await addDoc(collection(db, "news"), {
+        title: document.getElementById('news-title').value,
+        body: document.getElementById('news-body').value,
+        date: new Date().toLocaleDateString(),
+        timestamp: serverTimestamp()
+    });
+    document.getElementById('news-form').reset();
+    showResponseText(btn, 'success', "Published to the Grid!");
+    window.fetchNews();
+};
+
+window.fetchTerms = async function() {
+    const termsBox = document.getElementById('terms-content'); if(!termsBox) return;
+    try { const res = await fetch('terms.md'); const text = await res.text(); termsBox.innerHTML = marked.parse(text); } 
+    catch(e) { termsBox.innerHTML = `<p style="color:var(--crimson);">Error loading terms</p>`; }
+};
+
+window.fetchPrivacy = async function() {
+    const privacyBox = document.getElementById('privacy-content'); if(!privacyBox) return;
+    try { const res = await fetch('privacy.md'); const text = await res.text(); privacyBox.innerHTML = marked.parse(text); } 
+    catch(e) { privacyBox.innerHTML = `<p style="color:var(--crimson);">Error loading privacy</p>`; }
+};
+
+// --- CHAT & BOTS ---
 window.submitChat = async function(e) {
     e.preventDefault();
     const input = document.getElementById('chat-input');
     const text = input.value.trim();
-    if(!text) return;
+    if(!text || !currentUser) return;
 
-    // Send original message
     const msgData = {
-        text: text, senderUid: auth.currentUser.uid, senderEmail: auth.currentUser.email,
-        senderName: auth.currentUser.displayName || auth.currentUser.email.split('@')[0], 
-        senderPfp: auth.currentUser.photoURL || DEFAULT_PFP, timestamp: serverTimestamp()
+        text: text, senderUid: currentUser.uid, senderEmail: currentUser.email,
+        senderName: currentUser.displayName || currentUser.email.split('@')[0], 
+        senderPfp: currentUser.photoURL || DEFAULT_PFP, timestamp: serverTimestamp()
     };
-
     input.value = "";
 
     if (activeChatType === 'server' && activeServerId && activeChannelId) {
         const msgRef = collection(db, "discord_servers", activeServerId, "channels", activeChannelId, "messages");
         await addDoc(msgRef, msgData);
 
-        // CLIENT-SIDE BOT ENGINE
         if (activeServerData && activeServerData.bots) {
             activeServerData.bots.forEach(bot => {
                 if (text.toLowerCase().includes(bot.trigger.toLowerCase())) {
@@ -149,12 +221,10 @@ window.submitChat = async function(e) {
                             senderName: bot.name, senderPfp: 'https://cdn-icons-png.flaticon.com/512/4712/4712035.png',
                             isBot: true, timestamp: serverTimestamp()
                         });
-                    }, 600); // Small natural delay
+                    }, 600);
                 }
             });
         }
-    } else if (activeChatType === 'dm' && activeDmId) {
-        await addDoc(collection(db, "dms", activeDmId, "messages"), msgData);
     }
 };
 
@@ -185,6 +255,7 @@ window.deleteBot = async function(botId) {
 
 window.renderBotList = async function() {
     const list = document.getElementById('bot-list');
+    if(!list) return;
     list.innerHTML = "Loading bots...";
     const snap = await getDoc(doc(db, "discord_servers", activeServerId));
     activeServerData = snap.data();
@@ -204,13 +275,13 @@ window.renderBotList = async function() {
 
 window.selectChannel = function(channelId, channelName, element) {
     activeChatType = 'server'; activeChannelId = channelId;
-    document.getElementById('active-channel-name').innerHTML = `<span style="color:#80848e; margin-right:5px;">#</span> ${channelName}`;
+    document.getElementById('active-channel-name').innerHTML = `${channelName}`;
     document.getElementById('chat-form').style.display = 'block';
     
     document.querySelectorAll('.channel-item').forEach(el => el.classList.remove('active'));
     if(element) element.classList.add('active');
 
-    const myName = auth.currentUser.displayName || auth.currentUser.email.split('@')[0];
+    const myName = currentUser?.displayName || currentUser?.email.split('@')[0];
 
     if(chatterMessagesUnsub) chatterMessagesUnsub();
     const box = document.getElementById('chat-box');
@@ -227,15 +298,15 @@ window.selectChannel = function(channelId, channelName, element) {
             let formattedText = m.text.replace(/@(\w+)/g, '<span class="mention">@$1</span>');
 
             box.innerHTML += `
-                <div class="dc-msg ${pingClass}">
-                    <img src="${m.senderPfp || DEFAULT_PFP}" class="dc-avatar" onclick="window.openDM('${m.senderUid}', '${m.senderName.replace(/'/g, "\\'")}')">
-                    <div class="dc-msg-content">
-                        <div class="dc-msg-header">
-                            <span class="dc-username">${m.senderName}</span>
+                <div class="msg ${pingClass}">
+                    <img src="${m.senderPfp || DEFAULT_PFP}" class="chat-pfp">
+                    <div class="msg-content">
+                        <div class="msg-header">
+                            <span class="msg-sender">${m.senderName}</span>
                             ${botHtml}
-                            <span class="dc-timestamp">${timeStr}</span>
+                            <span class="msg-timestamp">${timeStr}</span>
                         </div>
-                        <div class="dc-msg-text">${formattedText}</div>
+                        <div class="msg-text">${formattedText}</div>
                     </div>
                 </div>`;
         });
@@ -250,7 +321,7 @@ window.selectServer = function(serverId, serverData, element) {
     activeChatType = 'server'; activeServerId = serverId; activeServerData = serverData; activeChannelId = null;
     document.getElementById('active-server-name').innerText = serverData.name;
     
-    const amIAdmin = serverData.admins?.includes(auth.currentUser.uid) || serverData.owner === auth.currentUser.uid;
+    const amIAdmin = serverData.admins?.includes(currentUser.uid) || serverData.owner === currentUser.uid;
     document.getElementById('add-channel-btn').style.display = amIAdmin ? 'block' : 'none';
     document.getElementById('server-settings-btn').style.display = amIAdmin ? 'block' : 'none';
     document.getElementById('chat-form').style.display = 'none';
@@ -276,17 +347,23 @@ window.selectServer = function(serverId, serverData, element) {
 
 window.openServerSettings = async function() {
     const modal = document.getElementById('server-settings-modal');
+    if(!modal) return;
     modal.style.display = 'flex';
     const serverSnap = await getDoc(doc(db, "discord_servers", activeServerId));
     activeServerData = serverSnap.data();
+    
+    const url = activeServerData.photoURL || "";
+    const preview = document.getElementById('server-icon-preview');
+    if(preview) { preview.src = url; preview.style.display = url ? 'block' : 'none'; }
+    
     window.renderBotList();
 };
 
 window.createServer = async function() {
-    if(!auth.currentUser) return;
+    if(!currentUser) return;
     window.showCustomPrompt("Create Server", "Enter a name for your new server:", "Server Name...", async (name) => {
         const newServer = await addDoc(collection(db, "discord_servers"), { 
-            name: name, owner: auth.currentUser.uid, members: [auth.currentUser.uid], admins: [auth.currentUser.uid], bots: [], timestamp: serverTimestamp()
+            name: name, owner: currentUser.uid, members: [currentUser.uid], admins: [currentUser.uid], bots: [], timestamp: serverTimestamp()
         });
         await addDoc(collection(db, "discord_servers", newServer.id, "channels"), { name: "general", timestamp: serverTimestamp() });
     });
@@ -315,22 +392,24 @@ window.openDiscovery = async function() {
     discBox.innerHTML = "";
     snap.forEach(docSnap => {
         const data = docSnap.data();
-        if(!data.members?.includes(auth.currentUser.uid)) {
-            const imgHtml = data.photoURL ? `<img src="${data.photoURL}">` : `<div style="width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,0.1);margin:0 auto 10px;line-height:80px;font-size:1.5rem;">${data.name.substring(0,2).toUpperCase()}</div>`;
+        if(!data.members?.includes(currentUser.uid)) {
+            const imgHtml = data.photoURL ? `<img src="${data.photoURL}">` : `<div style="width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,0.1);margin:0 auto 10px;line-height:80px;font-size:1.5rem; color: white;">${data.name.substring(0,2).toUpperCase()}</div>`;
             discBox.innerHTML += `<div class="discovery-card">${imgHtml}<h3 style="margin-top:0;">${data.name}</h3><button class="btn-primary" onclick="joinServer('${docSnap.id}')">Join Server</button></div>`;
         }
     });
 };
 
 window.joinServer = async function(serverId) {
-    await updateDoc(doc(db, "discord_servers", serverId), { members: arrayUnion(auth.currentUser.uid) });
+    await updateDoc(doc(db, "discord_servers", serverId), { members: arrayUnion(currentUser.uid) });
     window.openDiscovery(); 
 };
 
 window.initChatter = function() {
     if(chatterServersUnsub) return;
     const serverList = document.getElementById('server-list');
-    const myServersQuery = query(collection(db, "discord_servers"), where("members", "array-contains", auth.currentUser.uid));
+    if(!serverList || !currentUser) return;
+
+    const myServersQuery = query(collection(db, "discord_servers"), where("members", "array-contains", currentUser.uid));
     
     chatterServersUnsub = onSnapshot(myServersQuery, snap => {
         serverList.innerHTML = "";
@@ -346,24 +425,157 @@ window.initChatter = function() {
     });
 };
 
-// ... Routing & Auth State
+// --- ROUTING & AUTH STATE ---
 window.routeTo = function(page) {
     document.querySelectorAll('.page-content').forEach(p => p.style.display = 'none');
-    document.getElementById('page-' + page).style.display = 'block';
-    if(page === 'chatter' && auth.currentUser) window.initChatter();
+    const pg = document.getElementById('page-' + page);
+    if(pg) pg.style.display = 'block';
+    
+    document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
+    const activeLink = document.querySelector(`.nav-links a[onclick="routeTo('${page}')"]`);
+    if(activeLink) {
+        activeLink.classList.add('active');
+        const blobMain = document.getElementById('blob-main');
+        const blobTrail = document.getElementById('blob-trail');
+        if(blobMain && blobTrail) {
+            blobMain.style.width = `${activeLink.offsetWidth}px`; 
+            blobMain.style.left = `${activeLink.offsetLeft}px`; 
+            blobTrail.style.width = `${activeLink.offsetWidth}px`; 
+            blobTrail.style.left = `${activeLink.offsetLeft}px`; 
+        }
+    }
+
+    try {
+        if(page === 'home') window.fetchHomeImages();
+        if(page === 'updates') window.fetchNews();
+        if(page === 'terms') window.fetchTerms();
+        if(page === 'privacy') window.fetchPrivacy();
+    } catch (e) { console.error(e); }
 };
 
 onAuthStateChanged(auth, user => {
     if(user && (user.emailVerified || user.providerData.some(p => p.providerId === 'google.com'))) {
-        document.getElementById('nav-auth-link').innerText = "Dashboard";
-        document.getElementById('login-container').style.display = 'none';
-        document.getElementById('dashboard-container').style.display = 'block';
-        document.getElementById('chatter-locked').style.display = 'none';
-        document.getElementById('chatter-system').style.display = 'flex';
+        currentUser = user;
+        isGlobalAdmin = (user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase());
+
+        const navAuth = document.getElementById('nav-auth-link');
+        if(navAuth) navAuth.innerText = "Dashboard";
+        
+        const loginC = document.getElementById('login-container'); if(loginC) loginC.style.display = 'none';
+        const dashC = document.getElementById('dashboard-container'); if(dashC) dashC.style.display = 'block';
+        
+        const chatLock = document.getElementById('chatter-locked'); if(chatLock) chatLock.style.display = 'none';
+        const chatSys = document.getElementById('chatter-system'); 
+        if(chatSys) { chatSys.style.display = 'flex'; window.initChatter(); }
+
+        // Populate Dashboard Data
+        const emailEl = document.getElementById('user-display-email'); if(emailEl) emailEl.innerText = user.email;
+        const nameEl = document.getElementById('display-name'); if(nameEl) nameEl.value = user.displayName || "";
+        const pfpEl = document.getElementById('dashboard-pfp-preview'); if(pfpEl) pfpEl.src = user.photoURL || DEFAULT_PFP;
+
+        // Admin Controls
+        const adminPanel = document.getElementById('admin-panel'); if(adminPanel) adminPanel.style.display = isGlobalAdmin ? 'block' : 'none';
+        const adminHome = document.getElementById('admin-home-editor'); if(adminHome) adminHome.style.display = isGlobalAdmin ? 'block' : 'none';
+        
+        // Ensure Users DB Collection is in sync
+        setDoc(doc(db, "users", currentUser.uid), {
+            uid: currentUser.uid,
+            username: (user.displayName || user.email.split('@')[0]).toLowerCase(),
+            displayName: user.displayName || user.email.split('@')[0]
+        }, { merge: true });
+
     } else {
-        document.getElementById('login-container').style.display = 'block';
-        document.getElementById('chatter-locked').style.display = 'flex';
-        document.getElementById('chatter-system').style.display = 'none';
+        currentUser = null;
+        isGlobalAdmin = false;
+        
+        const loginC = document.getElementById('login-container'); if(loginC) loginC.style.display = 'block';
+        const dashC = document.getElementById('dashboard-container'); if(dashC) dashC.style.display = 'none';
+        const chatLock = document.getElementById('chatter-locked'); if(chatLock) chatLock.style.display = 'block';
+        const chatSys = document.getElementById('chatter-system'); if(chatSys) chatSys.style.display = 'none';
+        
+        const adminPanel = document.getElementById('admin-panel'); if(adminPanel) adminPanel.style.display = 'none';
+        const adminHome = document.getElementById('admin-home-editor'); if(adminHome) adminHome.style.display = 'none';
     }
 });
-setTimeout(() => { window.routeTo('home'); }, 100);
+
+// --- DRAG AND DROP UPLOADS ---
+const pfpDropZone = document.getElementById('pfp-drop-zone');
+const pfpFileInput = document.getElementById('pfp-file-input');
+if(pfpDropZone && pfpFileInput) {
+    pfpDropZone.addEventListener('click', () => pfpFileInput.click());
+    pfpFileInput.addEventListener('change', (e) => handleImageUpload(e.target.files[0], 'pfp', pfpDropZone)); 
+    pfpDropZone.addEventListener('dragover', (e) => { e.preventDefault(); pfpDropZone.classList.add('dragover'); });
+    pfpDropZone.addEventListener('dragleave', () => pfpDropZone.classList.remove('dragover'));
+    pfpDropZone.addEventListener('drop', (e) => { e.preventDefault(); pfpDropZone.classList.remove('dragover'); if (e.dataTransfer.files.length) handleImageUpload(e.dataTransfer.files[0], 'pfp', pfpDropZone); });
+}
+
+const serverDropZone = document.getElementById('server-drop-zone');
+const serverFileInput = document.getElementById('server-file-input');
+if(serverDropZone && serverFileInput) {
+    serverDropZone.addEventListener('click', () => serverFileInput.click());
+    serverFileInput.addEventListener('change', (e) => handleImageUpload(e.target.files[0], 'server', serverDropZone));
+    serverDropZone.addEventListener('dragover', (e) => { e.preventDefault(); serverDropZone.classList.add('dragover'); });
+    serverDropZone.addEventListener('dragleave', () => serverDropZone.classList.remove('dragover'));
+    serverDropZone.addEventListener('drop', (e) => { e.preventDefault(); serverDropZone.classList.remove('dragover'); if (e.dataTransfer.files.length) handleImageUpload(e.dataTransfer.files[0], 'server', serverDropZone); });
+}
+
+const homeDropZone = document.getElementById('home-drop-zone');
+const homeFileInput = document.getElementById('home-file-input');
+if(homeDropZone && homeFileInput) {
+    homeDropZone.addEventListener('click', () => homeFileInput.click());
+    homeFileInput.addEventListener('change', (e) => handleImageUpload(e.target.files[0], 'home', homeDropZone));
+    homeDropZone.addEventListener('dragover', (e) => { e.preventDefault(); homeDropZone.classList.add('dragover'); });
+    homeDropZone.addEventListener('dragleave', () => homeDropZone.classList.remove('dragover'));
+    homeDropZone.addEventListener('drop', (e) => { e.preventDefault(); homeDropZone.classList.remove('dragover'); if (e.dataTransfer.files.length) handleImageUpload(e.dataTransfer.files[0], 'home', homeDropZone); });
+}
+
+async function handleImageUpload(file, type, triggeringElement) {
+    if (!file || !file.type.startsWith('image/')) {
+        window.showCustomAlert("Error: Not a valid image.");
+        return;
+    }
+
+    if (type === 'home' && !isGlobalAdmin) {
+        window.showCustomAlert("Error: Only Global Admins can modify the homepage gallery.");
+        return;
+    }
+
+    let statusEl, previewEl;
+    if (type === 'pfp') { statusEl = document.getElementById('upload-status'); previewEl = document.getElementById('dashboard-pfp-preview'); } 
+    else if (type === 'server') { if(!activeServerId) return; statusEl = document.getElementById('server-upload-status'); previewEl = document.getElementById('server-icon-preview'); } 
+    else if (type === 'home') { statusEl = document.getElementById('home-upload-status'); }
+
+    if(statusEl) { statusEl.style.display = 'block'; statusEl.innerText = "Syncing with ImgBB Grid..."; }
+
+    try {
+        const formData = new FormData(); formData.append("image", file);
+        const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, { method: "POST", body: formData });
+        const data = await response.json();
+        
+        if (!data.success) throw new Error("ImgBB Upload Failed");
+        const downloadURL = data.data.url;
+
+        if(previewEl) { previewEl.src = downloadURL; previewEl.style.display = 'block'; }
+
+        if (type === 'pfp') {
+            if(statusEl) statusEl.innerText = "Synced! Click 'Save Profile Info'.";
+        } else if (type === 'server') {
+            await updateDoc(doc(db, "discord_servers", activeServerId), { photoURL: downloadURL });
+            if(statusEl) statusEl.innerText = "Server Icon Synced!";
+        } else if (type === 'home') {
+            await addDoc(collection(db, "home_images"), { url: downloadURL, timestamp: serverTimestamp() });
+            if(statusEl) statusEl.innerText = "Synced to Homepage!";
+            window.fetchHomeImages(); 
+        }
+        setTimeout(() => { if(statusEl) statusEl.style.display = 'none'; }, 4000);
+    } catch (error) {
+        if(statusEl) statusEl.innerText = "ImgBB Sync Failed";
+        console.error("IMGBB Error:", error);
+    }
+}
+
+// Initial route
+setTimeout(() => {
+    // If we are on index.html, default to home.
+    if(document.getElementById('page-home')) window.routeTo('home');
+}, 100);
