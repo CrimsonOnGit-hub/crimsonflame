@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dialog | CrimsonFlame</title>
+    <title>Droplet | CrimsonFlame</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body style="overflow: hidden;">
@@ -14,20 +14,25 @@
 
     <nav>
         <div class="nav-logo">CrimsonFlame <span style="color:var(--text-muted); font-size:1rem;">| Dialog</span></div>
-        <div class="nav-links"><a href="index.html" style="color: var(--text-main);">← Back to Hub</a></div>
+        <div class="nav-links">
+            <a href="index.html">← Back to Hub</a>
+            <a href="chatter.html">Chatter</a>
+            <a href="dashboard.html">Dashboard</a>
+        </div>
     </nav>
 
-    <main style="display: flex; height: calc(100vh - 65px); background: var(--dc-bg);">
+    <main style="display: flex; height: calc(100vh - 65px);">
+        
         <div class="channel-sidebar" style="width: 300px; height: 100%; display: flex; flex-direction: column;">
             <div class="sidebar-header">
-                <h3 style="color: var(--dc-text-muted);">Friends</h3>
+                <h3>Friends</h3>
                 <button class="icon-btn" id="addFriendBtn" title="Add Friend" style="color: #4ade80; font-size: 1.5rem;">+</button>
             </div>
-            <div id="friends-list" class="channel-list-container" style="flex: 0 0 150px; border-bottom: 1px solid #1f2023;"></div>
+            <div id="friends-list" class="channel-list-container" style="flex: 0 0 150px; border-bottom: 1px solid var(--glass-border);"></div>
 
             <div class="sidebar-header">
-                <h3 style="color: var(--dc-text-muted);">Direct Messages</h3>
-                <button class="icon-btn" id="newChatBtn" title="New Chat" style="color: var(--dc-text-muted); font-size: 1.5rem;">+</button>
+                <h3>Direct Messages</h3>
+                <button class="icon-btn" id="newChatBtn" title="New Chat" style="color: var(--crimson); font-size: 1.5rem;">+</button>
             </div>
             <div id="chat-list" class="channel-list-container" style="flex: 1;"></div>
         </div>
@@ -35,7 +40,7 @@
         <div class="chat-main" style="position: relative;">
             <div class="chat-header" style="display: flex; justify-content: space-between; align-items: center;">
                 <h3 id="active-chat-name" style="color: #fff;">@ Select a conversation</h3>
-                <button id="startCallBtn" class="btn-primary" style="width: auto; padding: 6px 16px; display: none; background: #23a559;">📞 Call</button>
+                <button id="startCallBtn" class="btn-primary" style="width: auto; padding: 6px 16px; display: none;">📞 Call</button>
             </div>
             
             <div class="chat-content">
@@ -43,18 +48,15 @@
             </div>
 
             <form id="message-form" class="chat-input-area" style="display:none;">
-                <div class="dc-input-wrapper">
-                    <span style="color: var(--dc-text-muted); font-size: 1.2rem; margin-right: 10px; cursor: pointer;">+</span>
-                    <input type="text" id="message-input" placeholder="Message @user..." autocomplete="off">
-                </div>
+                <input type="text" id="message-input" placeholder="Message @user..." autocomplete="off">
             </form>
 
-            <div id="video-overlay" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: var(--dc-bg); z-index: 50; flex-direction: column;">
-                <div id="incoming-call-ui" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; z-index: 60; background: var(--dc-sidebar); padding: 40px; border-radius: 16px; border: 1px solid #1f2023;">
+            <div id="video-overlay" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10, 10, 12, 0.9); z-index: 50; flex-direction: column;">
+                <div id="incoming-call-ui" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; z-index: 60; background: var(--glass-panel); padding: 40px; border-radius: 16px; border: 1px solid var(--glass-border);">
                     <h2 style="color: white; margin-top:0;">Incoming Call...</h2>
                     <div style="display: flex; gap: 15px; margin-top: 20px;">
-                        <button id="answerCallBtn" class="btn-secondary" style="background: #23a559; color: white; border:none;">Answer</button>
-                        <button id="declineCallBtn" class="btn-danger" style="background: #da373c; border:none;">Decline</button>
+                        <button id="answerCallBtn" class="btn-secondary" style="background: #4ade80; color: #111;">Answer</button>
+                        <button id="declineCallBtn" class="btn-danger">Decline</button>
                     </div>
                 </div>
 
@@ -69,10 +71,10 @@
                     </div>
                 </div>
 
-                <div style="padding: 20px; display: flex; justify-content: center; gap: 15px; background: var(--dc-sidebar);">
+                <div style="padding: 20px; display: flex; justify-content: center; gap: 15px; background: rgba(0,0,0,0.5);">
                     <button id="toggleMicBtn" class="btn-secondary">Mute Mic</button>
                     <button id="toggleCamBtn" class="btn-secondary">Cam Off</button>
-                    <button id="hangupBtn" class="btn-danger" style="background: #da373c; border:none;">Hangup</button>
+                    <button id="hangupBtn" class="btn-danger">Hangup</button>
                 </div>
             </div>
         </div>
@@ -91,7 +93,7 @@
     </div>
     <div id="custom-alert" class="custom-modal-overlay">
         <div class="custom-modal-box"><div class="custom-modal-content">
-            <h3 class="custom-modal-title">CrimsonFlame</h3>
+            <h3 class="custom-modal-title">CrimsonFlame Alert</h3>
             <p id="custom-alert-message" class="custom-modal-text"></p>
             <button id="custom-alert-ok" class="custom-modal-btn confirm" style="width: 50%;">OK</button>
         </div></div>
