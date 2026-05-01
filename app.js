@@ -35,8 +35,9 @@ let ticketChatUnsubscribe = null;
 let activeTicketId = null;
 let isLogin = true;
 
-// GLOBAL NODE EDITOR INSTANCE
+// GLOBAL NODE EDITOR INSTANCE & EDITING STATE
 window.botEditor = null;
+window.editingBotId = null;
 
 // --- CUSTOM LIQUID MODALS GLOBALS ---
 window.showCustomPrompt = function(title, desc, placeholder, onConfirm) {
@@ -279,22 +280,32 @@ window.submitTicketChat = async function(e) {
 
 // --- CHATTER, BOTS, AND VISUAL PARSING ---
 
-window.startVisualBotBuilder = function() {
+window.startVisualBotBuilder = function(botIdToEdit = null) {
     document.getElementById('server-settings-main-view').style.display = 'none';
     document.getElementById('bot-builder-ui').style.display = 'flex';
-    document.getElementById('botName').value = "";
     
     const container = document.getElementById('drawflow-container');
     container.innerHTML = ""; 
     
-    // Initialize Drawflow
     window.botEditor = new Drawflow(container);
     window.botEditor.start();
+    window.editingBotId = botIdToEdit;
+
+    if (botIdToEdit && activeServerData && activeServerData.bots) {
+        const bot = activeServerData.bots.find(b => b.id === botIdToEdit);
+        if (bot) {
+            document.getElementById('botName').value = bot.name;
+            try { window.botEditor.import(bot.graph); } catch(err) { console.error("Error loading bot graph:", err); }
+        }
+    } else {
+        document.getElementById('botName').value = "";
+    }
 };
 
 window.cancelBotBuild = function() {
     document.getElementById('server-settings-main-view').style.display = 'block';
     document.getElementById('bot-builder-ui').style.display = 'none';
+    window.editingBotId = null; 
 };
 
 window.addBotNode = function(type) {
@@ -304,7 +315,11 @@ window.addBotNode = function(type) {
         window.botEditor.addNode('trigger', 0, 1, 50, 100, 'trigger', { keyword: '' }, html);
     } else if (type === 'action') {
         const html = `<div><div class="title-box">📤 Action Node</div><input type="text" df-reply placeholder="Bot will reply..."></div>`;
-        window.botEditor.addNode('action', 1, 0, 350, 100, 'action', { reply: '' }, html);
+        window.botEditor.addNode('action', 1, 0, 350, 50, 'action', { reply: '' }, html);
+    } else if (type === 'code') {
+        // NEW WEBHOOK CODE NODE
+        const html = `<div><div class="title-box">⚙️ Code Webhook</div><input type="text" df-url placeholder="Target URL (https://...)"><input type="text" df-code placeholder="Code payload..."></div>`;
+        window.botEditor.addNode('code', 1, 0, 350, 200, 'code', { url: '', code: '' }, html);
     }
 };
 
@@ -313,12 +328,23 @@ window.saveVisualBot = async function() {
     if(!name) return window.showCustomAlert("Please enter a Bot Name!");
     
     const exportData = window.botEditor.export();
+    let updatedBots = activeServerData.bots ? [...activeServerData.bots] : [];
     
-    const newBot = { id: Date.now().toString(), name: name, graph: exportData };
-    await updateDoc(doc(db, "discord_servers", activeServerId), { bots: arrayUnion(newBot) });
+    if (window.editingBotId) {
+        const index = updatedBots.findIndex(b => b.id === window.editingBotId);
+        if (index > -1) { updatedBots[index] = { id: window.editingBotId, name: name, graph: exportData }; }
+    } else {
+        const newBot = { id: Date.now().toString(), name: name, graph: exportData };
+        updatedBots.push(newBot);
+    }
+    
+    await updateDoc(doc(db, "discord_servers", activeServerId), { bots: updatedBots });
     
     window.showCustomAlert("Bot Graph Saved!");
     window.cancelBotBuild();
+    
+    const snap = await getDoc(doc(db, "discord_servers", activeServerId));
+    activeServerData = snap.data();
     window.renderBotList();
 };
 
@@ -327,6 +353,8 @@ window.deleteBot = async function(botId) {
     const botToRemove = activeServerData.bots.find(b => b.id === botId);
     if(botToRemove) {
         await updateDoc(doc(db, "discord_servers", activeServerId), { bots: arrayRemove(botToRemove) });
+        const snap = await getDoc(doc(db, "discord_servers", activeServerId));
+        activeServerData = snap.data();
         window.renderBotList();
     }
 };
@@ -338,11 +366,15 @@ window.renderBotList = async function() {
     activeServerData = snap.data();
     list.innerHTML = "";
     if(!activeServerData.bots || activeServerData.bots.length === 0) { list.innerHTML = "<p style='color:#aaa; font-size: 0.9rem;'>No bots yet.</p>"; return; }
+    
     activeServerData.bots.forEach(bot => {
         list.innerHTML += `<div class="bot-list-item">
             <div><strong style="color:var(--text-main)">${bot.name}</strong> <span class="bot-tag">APP</span><br>
             <small style="color:var(--text-muted)">Logic Graph Active</small></div>
-            <button class="btn-danger" style="padding: 5px 10px; width:auto;" onclick="deleteBot('${bot.id}')">Delete</button>
+            <div style="display:flex; gap:5px;">
+                <button class="btn-secondary" style="padding: 5px 10px; width:auto;" onclick="startVisualBotBuilder('${bot.id}')">Edit</button>
+                <button class="btn-danger" style="padding: 5px 10px; width:auto;" onclick="deleteBot('${bot.id}')">Delete</button>
+            </div>
         </div>`;
     });
 };
@@ -367,34 +399,64 @@ window.submitChat = async function(e) {
         // PARSE THE VISUAL DRAWFLOW GRAPH FOR BOTS
         if (activeServerData && activeServerData.bots) {
             activeServerData.bots.forEach(bot => {
-                const nodes = bot.graph.drawflow.Home.data;
-                
-                // Find all Triggers in the graph
-                Object.values(nodes).forEach(node => {
-                    if (node.name === 'trigger') {
-                        const keyword = node.data.keyword;
-                        if (keyword && text.toLowerCase().includes(keyword.toLowerCase())) {
-                            
-                            // If trigger matches, follow the wire to the next action!
-                            const connections = node.outputs['output_1'].connections;
-                            connections.forEach(conn => {
-                                const nextNode = nodes[conn.node];
-                                if (nextNode && nextNode.name === 'action') {
-                                    const reply = nextNode.data.reply;
-                                    if (reply) {
-                                        setTimeout(async () => {
-                                            await addDoc(msgRef, {
-                                                text: reply, senderUid: `bot_${bot.id}`, senderEmail: 'bot@system.local',
-                                                senderName: bot.name, senderPfp: 'https://cdn-icons-png.flaticon.com/512/4712/4712035.png',
-                                                isBot: true, timestamp: serverTimestamp()
-                                            });
-                                        }, 600);
+                if (bot.graph && bot.graph.drawflow && bot.graph.drawflow.Home && bot.graph.drawflow.Home.data) {
+                    const nodes = bot.graph.drawflow.Home.data;
+                    
+                    Object.values(nodes).forEach(node => {
+                        if (node.name === 'trigger') {
+                            const keyword = node.data.keyword;
+                            if (keyword && text.toLowerCase().includes(keyword.toLowerCase())) {
+                                
+                                const connections = node.outputs['output_1'].connections;
+                                connections.forEach(conn => {
+                                    const nextNode = nodes[conn.node];
+                                    
+                                    // Handle Text Reply Node
+                                    if (nextNode && nextNode.name === 'action') {
+                                        const reply = nextNode.data.reply;
+                                        if (reply) {
+                                            setTimeout(async () => {
+                                                await addDoc(msgRef, {
+                                                    text: reply, senderUid: `bot_${bot.id}`, senderEmail: 'bot@system.local',
+                                                    senderName: bot.name, senderPfp: 'https://cdn-icons-png.flaticon.com/512/4712/4712035.png',
+                                                    isBot: true, timestamp: serverTimestamp()
+                                                });
+                                            }, 600);
+                                        }
+                                    } 
+                                    // Handle HTTP Webhook Node
+                                    else if (nextNode && nextNode.name === 'code') {
+                                        const targetUrl = nextNode.data.url;
+                                        const codePayload = nextNode.data.code;
+                                        
+                                        if (targetUrl && codePayload) {
+                                            const payloadStr = `chatter-bot-code-${codePayload}`;
+                                            
+                                            // 1. Fire Webhook POST request silently in the background
+                                            try {
+                                                fetch(targetUrl, {
+                                                    method: 'POST',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify({ payload: payloadStr, triggeredBy: currentUser.displayName })
+                                                }).catch(err => console.warn("Webhook fetch blocked or failed:", err));
+                                            } catch(err) { console.error(err); }
+
+                                            // 2. Post a confirmation into the chat
+                                            setTimeout(async () => {
+                                                await addDoc(msgRef, {
+                                                    text: `[SYSTEM WEBHOOK FIRED]: ${payloadStr}`, 
+                                                    senderUid: `bot_${bot.id}`, senderEmail: 'bot@system.local',
+                                                    senderName: bot.name, senderPfp: 'https://cdn-icons-png.flaticon.com/512/4712/4712035.png',
+                                                    isBot: true, timestamp: serverTimestamp()
+                                                });
+                                            }, 600);
+                                        }
                                     }
-                                }
-                            });
+                                });
+                            }
                         }
-                    }
-                });
+                    });
+                }
             });
         }
     }
@@ -422,7 +484,13 @@ window.selectChannel = function(channelId, channelName, element) {
             const botHtml = m.isBot ? `<span class="bot-tag">✔ APP</span>` : '';
             const isPinged = m.text.includes(`@${myName}`) || m.text.includes('@everyone');
             const pingClass = isPinged ? 'ping-highlight' : '';
-            let formattedText = m.text.replace(/@(\w+)/g, '<span class="mention">@$1</span>');
+            
+            let displayText = m.text;
+            if (m.text.startsWith('[SYSTEM WEBHOOK FIRED]')) {
+                displayText = `<span style="color:#4ade80; font-family:monospace;">${m.text}</span>`;
+            } else {
+                displayText = m.text.replace(/@(\w+)/g, '<span class="mention">@$1</span>');
+            }
 
             box.innerHTML += `
                 <div class="msg ${pingClass}">
@@ -433,7 +501,7 @@ window.selectChannel = function(channelId, channelName, element) {
                             ${botHtml}
                             <span class="msg-timestamp">${timeStr}</span>
                         </div>
-                        <div class="msg-text">${formattedText}</div>
+                        <div class="msg-text">${displayText}</div>
                     </div>
                 </div>`;
         });
@@ -448,7 +516,7 @@ window.selectServer = function(serverId, serverData, element) {
     activeChatType = 'server'; activeServerId = serverId; activeServerData = serverData; activeChannelId = null;
     document.getElementById('active-server-name').innerText = serverData.name;
     
-    const box = document.getElementById('chat-box'); if(box) box.innerHTML = ""; // BUG FIX: Instantly clears history
+    const box = document.getElementById('chat-box'); if(box) box.innerHTML = ""; 
 
     const amIAdmin = serverData.admins?.includes(currentUser.uid) || serverData.owner === currentUser.uid;
     document.getElementById('add-channel-btn').style.display = amIAdmin ? 'block' : 'none';
@@ -471,41 +539,6 @@ window.selectServer = function(serverId, serverData, element) {
             el.onclick = (e) => { e.preventDefault(); window.selectChannel(docSnap.id, cData.name, el); };
             channelList.appendChild(el);
         });
-    });
-};
-
-window.openServerSettings = async function() {
-    const modal = document.getElementById('server-settings-modal');
-    if(!modal) return;
-    
-    // Reset view to main settings
-    document.getElementById('server-settings-main-view').style.display = 'block';
-    document.getElementById('bot-builder-ui').style.display = 'none';
-    
-    modal.style.display = 'flex';
-    const serverSnap = await getDoc(doc(db, "discord_servers", activeServerId));
-    activeServerData = serverSnap.data();
-    
-    const url = activeServerData.photoURL || "";
-    const preview = document.getElementById('server-icon-preview');
-    if(preview) { preview.src = url; preview.style.display = url ? 'block' : 'none'; }
-    window.renderBotList();
-};
-
-window.createServer = async function() {
-    if(!currentUser) return;
-    window.showCustomPrompt("Create Server", "Enter a name for your new server:", "Server Name...", async (name) => {
-        const newServer = await addDoc(collection(db, "discord_servers"), { 
-            name: name, owner: currentUser.uid, members: [currentUser.uid], admins: [currentUser.uid], bots: [], timestamp: serverTimestamp()
-        });
-        await addDoc(collection(db, "discord_servers", newServer.id, "channels"), { name: "general", timestamp: serverTimestamp() });
-    });
-};
-
-window.createChannel = async function() {
-    if(!activeServerId) return;
-    window.showCustomPrompt("Add Channel", "Enter the new channel name:", "Channel Name...", async (name) => {
-        await addDoc(collection(db, "discord_servers", activeServerId, "channels"), { name: name.toLowerCase().replace(/\s+/g, '-'), timestamp: serverTimestamp() });
     });
 };
 
@@ -601,16 +634,13 @@ onAuthStateChanged(auth, user => {
         const chatSys = document.getElementById('chatter-system'); 
         if(chatSys) { chatSys.style.display = 'flex'; window.initChatter(); }
 
-        // Support Sync
         const supLock = document.getElementById('support-locked'); if(supLock) supLock.style.display = 'none';
         const supSys = document.getElementById('page-support'); if(supSys) { supSys.style.display = 'block'; window.fetchTickets(); }
 
-        // Population
         const emailEl = document.getElementById('user-display-email'); if(emailEl) emailEl.innerText = user.email;
         const nameEl = document.getElementById('display-name'); if(nameEl) nameEl.value = user.displayName || "";
         const pfpEl = document.getElementById('dashboard-pfp-preview'); if(pfpEl) pfpEl.src = user.photoURL || DEFAULT_PFP;
 
-        // Admin Controls
         const adminPanel = document.getElementById('admin-panel'); if(adminPanel) adminPanel.style.display = isGlobalAdmin ? 'block' : 'none';
         const adminHome = document.getElementById('admin-home-editor'); if(adminHome) adminHome.style.display = isGlobalAdmin ? 'block' : 'none';
         
@@ -637,7 +667,6 @@ onAuthStateChanged(auth, user => {
     }
 });
 
-// --- DRAG AND DROP UPLOADS ---
 const pfpDropZone = document.getElementById('pfp-drop-zone');
 const pfpFileInput = document.getElementById('pfp-file-input');
 if(pfpDropZone && pfpFileInput) {
