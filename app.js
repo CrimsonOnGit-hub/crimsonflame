@@ -35,6 +35,9 @@ let ticketChatUnsubscribe = null;
 let activeTicketId = null;
 let isLogin = true;
 
+// GLOBAL NODE EDITOR INSTANCE
+window.botEditor = null;
+
 // --- CUSTOM LIQUID MODALS GLOBALS ---
 window.showCustomPrompt = function(title, desc, placeholder, onConfirm) {
     const overlay = document.getElementById('custom-prompt');
@@ -88,7 +91,7 @@ function showResponseText(element, type, text) {
     setTimeout(() => { statusDiv.remove(); }, 5000); 
 }
 
-// --- RESTORED CORE LOGIC (Login, Dashboard, Profile, Images) ---
+// --- AUTH LOGIC ---
 window.submitLogin = async function(e) {
     e.preventDefault();
     const btn = e.target.querySelector('button[type="submit"]');
@@ -125,7 +128,6 @@ window.submitProfile = async function(e) {
     if (auth.currentUser) {
         await updateProfile(auth.currentUser, { displayName: newName, photoURL: newPfp });
         showResponseText(btn, 'success', "Profile Saved Successfully!");
-        
         await setDoc(doc(db, "users", auth.currentUser.uid), { displayName: newName, photoURL: newPfp }, { merge: true });
     }
 };
@@ -137,7 +139,7 @@ window.toggleLoginMode = function() {
     document.getElementById('toggle-auth').innerText = isLogin ? "Register here" : "Login here";
 };
 
-// --- DATA FETCHING (Gallery, News, MD Files) ---
+// --- DATA FETCHING ---
 window.fetchHomeImages = async function() {
     const gallery = document.getElementById('home-gallery');
     if(!gallery) return;
@@ -189,11 +191,11 @@ window.fetchPrivacy = async function() {
     catch(e) { privacyBox.innerHTML = `<p style="color:var(--crimson);">Error loading privacy</p>`; }
 };
 
-// --- SUPPORT TICKETS (re-linked) ---
+// --- SUPPORT TICKETS ---
 window.fetchTickets = async function() {
     const locked = document.getElementById('support-locked'); if(!locked) return;
-    if(!currentUser) { locked.style.display = 'block'; document.getElementById('ticket-system').style.display = 'none'; return; }
-    locked.style.display = 'none'; document.getElementById('ticket-system').style.display = 'block';
+    if(!currentUser) { locked.style.display = 'block'; document.getElementById('page-support').style.display = 'none'; return; }
+    locked.style.display = 'none'; document.getElementById('page-support').style.display = 'block';
 
     const list = document.getElementById('ticket-list'); if(!list) return;
     let q = query(collection(db, "tickets"), orderBy("timestamp", "desc"));
@@ -205,7 +207,8 @@ window.fetchTickets = async function() {
         snap.forEach(tDoc => {
             const d = tDoc.data();
             const item = document.createElement('div');
-            item.className = "friend-item";
+            item.className = "auth-card";
+            item.style.cursor = "pointer";
             item.innerHTML = `<strong style="color:var(--text-main);">${d.subject}</strong> <span style="float:right; color:${d.status === 'Open' ? '#4ade80' : '#94a3b8'}">${d.status}</span><br><small style="color:var(--text-muted);">${d.userEmail}</small>`;
             item.onclick = () => window.openThread(tDoc.id, d);
             list.appendChild(item);
@@ -228,16 +231,15 @@ window.openThread = function(id, data) {
     document.getElementById('thread-view').style.display = 'block';
     document.getElementById('active-subject').innerText = data.subject;
     
-    // Safety check for Resolution Box elements (missing in user code before)
     if (data.status === "Closed") {
-        if(document.getElementById('ticket-chat-form')) document.getElementById('ticket-chat-form').style.display = 'none';
-        if(document.getElementById('admin-close-area')) document.getElementById('admin-close-area').style.display = 'none';
-        if(document.getElementById('resolution-box')) document.getElementById('resolution-box').style.display = 'block';
-        if(document.getElementById('resolution-text')) document.getElementById('resolution-text').innerText = data.closeReason || "No reason recorded.";
+        document.getElementById('ticket-chat-form').style.display = 'none';
+        document.getElementById('admin-close-area').style.display = 'none';
+        document.getElementById('resolution-box').style.display = 'block';
+        document.getElementById('resolution-text').innerText = data.closeReason || "No reason recorded.";
     } else {
-        if(document.getElementById('ticket-chat-form')) document.getElementById('ticket-chat-form').style.display = 'flex';
-        if(document.getElementById('resolution-box')) document.getElementById('resolution-box').style.display = 'none';
-        if(document.getElementById('admin-close-area')) document.getElementById('admin-close-area').style.display = isGlobalAdmin ? 'block' : 'none';
+        document.getElementById('ticket-chat-form').style.display = 'flex';
+        document.getElementById('resolution-box').style.display = 'none';
+        document.getElementById('admin-close-area').style.display = isGlobalAdmin ? 'block' : 'none';
     }
 
     if(ticketChatUnsubscribe) ticketChatUnsubscribe();
@@ -247,7 +249,7 @@ window.openThread = function(id, data) {
         snap.forEach(mDoc => {
             const m = mDoc.data();
             const isMe = m.sender === currentUser.email;
-            box.innerHTML += `<div style="align-self:${isMe ? 'flex-end' : 'flex-start'}; background:${isMe ? 'var(--crimson)' : 'rgba(255,255,255,0.05)'}; padding:8px 12px; border-radius:8px; max-width:80%; font-size:0.9rem;">
+            box.innerHTML += `<div style="align-self:${isMe ? 'flex-end' : 'flex-start'}; background:${isMe ? 'var(--crimson)' : 'rgba(255,255,255,0.05)'}; padding:8px 12px; border-radius:8px; max-width:80%; margin-bottom:10px; font-size:0.9rem;">
                 <small style="display:block; opacity:0.7; font-size:0.6rem;">${m.senderName || m.sender}</small>${m.text}</div>`;
         });
         box.scrollTop = box.scrollHeight;
@@ -275,61 +277,48 @@ window.submitTicketChat = async function(e) {
     input.value = "";
 };
 
-// --- CHAT & BOT ENGINE (Flowchart system) ---
-window.submitChat = async function(e) {
-    e.preventDefault();
-    const input = document.getElementById('chat-input');
-    const text = input.value.trim();
-    if(!text || !currentUser) return;
+// --- CHATTER, BOTS, AND VISUAL PARSING ---
 
-    const msgData = {
-        text: text, senderUid: currentUser.uid, senderEmail: currentUser.email,
-        senderName: currentUser.displayName || currentUser.email.split('@')[0], 
-        senderPfp: currentUser.photoURL || DEFAULT_PFP, timestamp: serverTimestamp()
-    };
-    input.value = "";
+window.startVisualBotBuilder = function() {
+    document.getElementById('server-settings-main-view').style.display = 'none';
+    document.getElementById('bot-builder-ui').style.display = 'flex';
+    document.getElementById('botName').value = "";
+    
+    const container = document.getElementById('drawflow-container');
+    container.innerHTML = ""; 
+    
+    // Initialize Drawflow
+    window.botEditor = new Drawflow(container);
+    window.botEditor.start();
+};
 
-    if (activeChatType === 'server' && activeServerId && activeChannelId) {
-        const msgRef = collection(db, "discord_servers", activeServerId, "channels", activeChannelId, "messages");
-        await addDoc(msgRef, msgData);
+window.cancelBotBuild = function() {
+    document.getElementById('server-settings-main-view').style.display = 'block';
+    document.getElementById('bot-builder-ui').style.display = 'none';
+};
 
-        if (activeServerData && activeServerData.bots) {
-            activeServerData.bots.forEach(bot => {
-                // Execute action based on flowchart logic
-                bot.blocks.forEach(block => {
-                    const [triggerText, actionText] = block.split('--> execute action: ');
-                    const userMatch = triggerText.split("'")[0].trim();
-                    const actualMsg = triggerText.split("'")[1].trim();
-
-                    if (text.toLowerCase() === actualMsg.toLowerCase()) {
-                        const [, replyMsg] = actionText.split("'");
-                        setTimeout(async () => {
-                            await addDoc(msgRef, {
-                                text: replyMsg, senderUid: `bot_${bot.id}`, senderEmail: 'bot@system.local',
-                                senderName: bot.name, senderPfp: 'https://cdn-icons-png.flaticon.com/512/4712/4712035.png',
-                                isBot: true, timestamp: serverTimestamp()
-                            });
-                        }, 800);
-                    }
-                });
-            });
-        }
+window.addBotNode = function(type) {
+    if(!window.botEditor) return;
+    if(type === 'trigger') {
+        const html = `<div><div class="title-box">📥 Trigger Node</div><input type="text" df-keyword placeholder="If user says..."></div>`;
+        window.botEditor.addNode('trigger', 0, 1, 50, 100, 'trigger', { keyword: '' }, html);
+    } else if (type === 'action') {
+        const html = `<div><div class="title-box">📤 Action Node</div><input type="text" df-reply placeholder="Bot will reply..."></div>`;
+        window.botEditor.addNode('action', 1, 0, 350, 100, 'action', { reply: '' }, html);
     }
 };
 
-window.submitBotFlowchart = async function() {
-    const name = document.getElementById('botName').value;
-    const logic = document.getElementById('flowchart-logic').value;
-    if(!name || !logic || !activeServerId) return;
-
-    const blocks = logic.split('\n').filter(line => line.trim().startsWith('@user said '));
-    if(blocks.length === 0) { window.showCustomAlert("Invalid flowchart format."); return; }
-
-    const newBot = { id: Date.now().toString(), name: name, blocks: blocks };
+window.saveVisualBot = async function() {
+    const name = document.getElementById('botName').value.trim();
+    if(!name) return window.showCustomAlert("Please enter a Bot Name!");
+    
+    const exportData = window.botEditor.export();
+    
+    const newBot = { id: Date.now().toString(), name: name, graph: exportData };
     await updateDoc(doc(db, "discord_servers", activeServerId), { bots: arrayUnion(newBot) });
     
-    document.getElementById('botName').value = "";
-    document.getElementById('flowchart-logic').value = "";
+    window.showCustomAlert("Bot Graph Saved!");
+    window.cancelBotBuild();
     window.renderBotList();
 };
 
@@ -352,10 +341,63 @@ window.renderBotList = async function() {
     activeServerData.bots.forEach(bot => {
         list.innerHTML += `<div class="bot-list-item">
             <div><strong style="color:var(--text-main)">${bot.name}</strong> <span class="bot-tag">APP</span><br>
-            <small style="color:var(--text-muted)">Hears flowchart blocks: E.g., "${bot.blocks[0]?.split("'")[1]}"</small></div>
+            <small style="color:var(--text-muted)">Logic Graph Active</small></div>
             <button class="btn-danger" style="padding: 5px 10px; width:auto;" onclick="deleteBot('${bot.id}')">Delete</button>
         </div>`;
     });
+};
+
+window.submitChat = async function(e) {
+    e.preventDefault();
+    const input = document.getElementById('chat-input');
+    const text = input.value.trim();
+    if(!text || !currentUser) return;
+
+    const msgData = {
+        text: text, senderUid: currentUser.uid, senderEmail: currentUser.email,
+        senderName: currentUser.displayName || currentUser.email.split('@')[0], 
+        senderPfp: currentUser.photoURL || DEFAULT_PFP, timestamp: serverTimestamp()
+    };
+    input.value = "";
+
+    if (activeChatType === 'server' && activeServerId && activeChannelId) {
+        const msgRef = collection(db, "discord_servers", activeServerId, "channels", activeChannelId, "messages");
+        await addDoc(msgRef, msgData);
+
+        // PARSE THE VISUAL DRAWFLOW GRAPH FOR BOTS
+        if (activeServerData && activeServerData.bots) {
+            activeServerData.bots.forEach(bot => {
+                const nodes = bot.graph.drawflow.Home.data;
+                
+                // Find all Triggers in the graph
+                Object.values(nodes).forEach(node => {
+                    if (node.name === 'trigger') {
+                        const keyword = node.data.keyword;
+                        if (keyword && text.toLowerCase().includes(keyword.toLowerCase())) {
+                            
+                            // If trigger matches, follow the wire to the next action!
+                            const connections = node.outputs['output_1'].connections;
+                            connections.forEach(conn => {
+                                const nextNode = nodes[conn.node];
+                                if (nextNode && nextNode.name === 'action') {
+                                    const reply = nextNode.data.reply;
+                                    if (reply) {
+                                        setTimeout(async () => {
+                                            await addDoc(msgRef, {
+                                                text: reply, senderUid: `bot_${bot.id}`, senderEmail: 'bot@system.local',
+                                                senderName: bot.name, senderPfp: 'https://cdn-icons-png.flaticon.com/512/4712/4712035.png',
+                                                isBot: true, timestamp: serverTimestamp()
+                                            });
+                                        }, 600);
+                                    }
+                                }
+                            });
+                        }
+                    }
+                });
+            });
+        }
+    }
 };
 
 window.selectChannel = function(channelId, channelName, element) {
@@ -373,7 +415,6 @@ window.selectChannel = function(channelId, channelName, element) {
     box.innerHTML = "";
 
     chatterMessagesUnsub = onSnapshot(query(collection(db, "discord_servers", activeServerId, "channels", activeChannelId, "messages"), orderBy("timestamp", "asc")), snap => {
-        // BUG FIX: History cleared *within* the snapshot callback before appending new messages
         box.innerHTML = "";
         snap.forEach(mDoc => {
             const m = mDoc.data();
@@ -407,8 +448,7 @@ window.selectServer = function(serverId, serverData, element) {
     activeChatType = 'server'; activeServerId = serverId; activeServerData = serverData; activeChannelId = null;
     document.getElementById('active-server-name').innerText = serverData.name;
     
-    // BUG FIX: History cleared immediately on server switch
-    const box = document.getElementById('chat-box'); if(box) box.innerHTML = "";
+    const box = document.getElementById('chat-box'); if(box) box.innerHTML = ""; // BUG FIX: Instantly clears history
 
     const amIAdmin = serverData.admins?.includes(currentUser.uid) || serverData.owner === currentUser.uid;
     document.getElementById('add-channel-btn').style.display = amIAdmin ? 'block' : 'none';
@@ -436,7 +476,13 @@ window.selectServer = function(serverId, serverData, element) {
 
 window.openServerSettings = async function() {
     const modal = document.getElementById('server-settings-modal');
-    if(!modal) return; modal.style.display = 'flex';
+    if(!modal) return;
+    
+    // Reset view to main settings
+    document.getElementById('server-settings-main-view').style.display = 'block';
+    document.getElementById('bot-builder-ui').style.display = 'none';
+    
+    modal.style.display = 'flex';
     const serverSnap = await getDoc(doc(db, "discord_servers", activeServerId));
     activeServerData = serverSnap.data();
     
@@ -555,7 +601,11 @@ onAuthStateChanged(auth, user => {
         const chatSys = document.getElementById('chatter-system'); 
         if(chatSys) { chatSys.style.display = 'flex'; window.initChatter(); }
 
-        // Population (Fixing the broken dashboard)
+        // Support Sync
+        const supLock = document.getElementById('support-locked'); if(supLock) supLock.style.display = 'none';
+        const supSys = document.getElementById('page-support'); if(supSys) { supSys.style.display = 'block'; window.fetchTickets(); }
+
+        // Population
         const emailEl = document.getElementById('user-display-email'); if(emailEl) emailEl.innerText = user.email;
         const nameEl = document.getElementById('display-name'); if(nameEl) nameEl.value = user.displayName || "";
         const pfpEl = document.getElementById('dashboard-pfp-preview'); if(pfpEl) pfpEl.src = user.photoURL || DEFAULT_PFP;
@@ -564,10 +614,6 @@ onAuthStateChanged(auth, user => {
         const adminPanel = document.getElementById('admin-panel'); if(adminPanel) adminPanel.style.display = isGlobalAdmin ? 'block' : 'none';
         const adminHome = document.getElementById('admin-home-editor'); if(adminHome) adminHome.style.display = isGlobalAdmin ? 'block' : 'none';
         
-        // Ensure Support logic loads
-        window.fetchTickets();
-
-        // Ensure Users DB Collection is in sync
         setDoc(doc(db, "users", currentUser.uid), {
             uid: currentUser.uid,
             username: (user.displayName || user.email.split('@')[0]).toLowerCase(),
@@ -575,18 +621,19 @@ onAuthStateChanged(auth, user => {
         }, { merge: true });
 
     } else {
-        currentUser = null;
-        isGlobalAdmin = false;
+        currentUser = null; isGlobalAdmin = false;
         
         const loginC = document.getElementById('login-container'); if(loginC) loginC.style.display = 'block';
         const dashC = document.getElementById('dashboard-container'); if(dashC) dashC.style.display = 'none';
+        
         const chatLock = document.getElementById('chatter-locked'); if(chatLock) chatLock.style.display = 'block';
         const chatSys = document.getElementById('chatter-system'); if(chatSys) chatSys.style.display = 'none';
         
+        const supLock = document.getElementById('support-locked'); if(supLock) supLock.style.display = 'block';
+        const supSys = document.getElementById('page-support'); if(supSys) supSys.style.display = 'none';
+
         const adminPanel = document.getElementById('admin-panel'); if(adminPanel) adminPanel.style.display = 'none';
         const adminHome = document.getElementById('admin-home-editor'); if(adminHome) adminHome.style.display = 'none';
-        
-        window.fetchTickets(); // Will show locked view
     }
 });
 
@@ -666,8 +713,4 @@ async function handleImageUpload(file, type, triggeringElement) {
     }
 }
 
-// Initial route
-setTimeout(() => {
-    // If we are on index.html, default to home.
-    if(document.getElementById('page-home')) window.routeTo('home');
-}, 100);
+setTimeout(() => { if(document.getElementById('page-home')) window.routeTo('home'); }, 100);
