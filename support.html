@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Support Center | CrimsonFlame</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body style="overflow: hidden;">
+
+    <svg width="0" height="0" style="position: absolute; pointer-events: none;" xmlns="http://www.w3.org/2000/svg" version="1.1">
+        <defs><filter id="goo"><feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur" /><feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 19 -9" result="goo" /><feComposite in="SourceGraphic" in2="goo" operator="atop"/></filter></defs>
+    </svg>
+
+    <nav>
+        <div class="nav-logo">CrimsonFlame <span style="color:var(--text-muted); font-size:1rem;">| Support</span></div>
+        <div class="nav-links">
+            <a href="index.html">Hub</a>
+            <a href="chatter.html">Chatter</a>
+            <a href="dialog.html" style="color: #93c5fd; font-weight: bold; margin-left: 15px;">Dialog (Call)</a>
+        </div>
+    </nav>
+
+    <main style="display: flex; justify-content: center; align-items: start; height: calc(100vh - 65px); padding-top: 40px;">
+        
+        <div id="support-locked" class="card-container" style="text-align: center; max-width: 400px; display: none;">
+            <h2>CrimsonFlame Access Required</h2>
+            <p>Support requires an active Grid account.</p>
+            <button class="btn-primary" onclick="window.location.href='index.html'">Go to Login</button>
+        </div>
+
+        <div id="page-support" class="page-content" style="display: block; width: 100%; max-width: 900px; padding: 0;">
+            <div id="ticket-system" class="card-container" style="display: block; max-width: 800px; margin: 0 auto;">
+                <div id="list-view">
+                    <h2>Grid Support Center</h2>
+                    <form id="ticket-form" onsubmit="submitTicket(event)" style="margin-bottom: 30px;">
+                        <input type="text" id="ticket-subject" placeholder="What do you need help with?" required>
+                        <textarea id="ticket-msg" placeholder="Describe the issue in detail...Support will reply via thread." rows="4" required></textarea>
+                        <button type="submit" class="btn-primary">Create Ticket</button>
+                    </form>
+                    <div id="ticket-list">Syncing tickets...</div>
+                </div>
+                <div id="thread-view" style="display: none;">
+                    <button class="btn-secondary" onclick="closeThreadView()">← Back to List</button>
+                    <h2 id="active-subject">Ticket Subject</h2>
+                    <div id="ticket-chat-box" class="messages-container" style="height: 300px; background: rgba(0,0,0,0.2); border-radius: 8px;"></div>
+                    <form id="ticket-chat-form" onsubmit="submitTicketChat(event)" style="display: flex; gap: 10px;">
+                        <input type="text" id="ticket-chat-input" placeholder="Type a reply..." style="flex: 1; margin-bottom: 0;" required>
+                        <button type="submit" class="btn-primary" style="width: auto;">Reply</button>
+                    </form>
+                    <div id="admin-close-area" style="display: none; margin-top: 20px;"><button class="btn-danger" style="width: 100%;" onclick="closeActiveTicket()">Close Ticket</button></div>
+                    <div id="resolution-box" style="display: none; margin-top: 20px; border-left: 4px solid var(--crimson); padding-left: 10px;"><strong>Ticket Closed:</strong> <span id="resolution-text"></span></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="custom-prompt" class="custom-modal-overlay">
+        <div class="custom-modal-box"><div class="custom-modal-content">
+            <h3 id="custom-prompt-title" class="custom-modal-title">Prompt</h3>
+            <p id="custom-prompt-desc" class="custom-modal-text"></p>
+            <input type="text" id="custom-prompt-input" class="custom-modal-input" autocomplete="off">
+            <div class="custom-modal-buttons">
+                <button id="custom-prompt-cancel" class="custom-modal-btn cancel">Cancel</button>
+                <button id="custom-prompt-confirm" class="custom-modal-btn confirm">Confirm</button>
+            </div>
+        </div></div>
+    </div>
+    <div id="custom-alert" class="custom-modal-overlay">
+        <div class="custom-modal-box"><div class="custom-modal-content">
+            <h3 class="custom-modal-title">CrimsonFlame Alert</h3>
+            <p id="custom-alert-message" class="custom-modal-text"></p>
+            <button id="custom-alert-ok" class="custom-modal-btn confirm" style="width: 50%;">OK</button>
+        </div></div>
+    </div>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>
