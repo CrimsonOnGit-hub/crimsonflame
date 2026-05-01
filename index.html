@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CrimsonFlame Official</title>
+    <title>CrimsonFlame Official | The Hub</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
@@ -17,11 +17,13 @@
         <div class="nav-logo">CrimsonFlame</div>
         <div class="nav-links">
             <div class="blob-container"><div id="blob-main" class="nav-blob"></div><div id="blob-trail" class="nav-blob"></div></div>
-            <a href="#" onclick="routeTo('home')">Home</a>
+            <a href="#" onclick="routeTo('home')" class="active">Home</a>
             <a href="#" onclick="routeTo('updates')">Updates</a>
             <a href="chatter.html">Chatter</a>
-            <a href="dialog.html">Droplet</a>
-            <a href="#" onclick="routeTo('tickets')">Support</a>
+            <a href="dialog.html" style="color: #93c5fd; font-weight: bold;">Dialog (Call)</a>
+            <a href="support.html">Support</a>
+            <a href="#" onclick="routeTo('terms')">Terms</a>
+            <a href="#" onclick="routeTo('privacy')">Privacy</a>
             <a href="#" onclick="routeTo('home')" id="nav-auth-link">Login</a>
         </div>
     </nav>
@@ -41,18 +43,28 @@
                     <button type="submit" class="btn-primary">Submit</button>
                 </form>
                 <hr style="border-color: var(--glass-border); margin: 20px 0;">
-                <button type="button" class="btn-secondary" style="width: 100%; margin-bottom: 15px;" onclick="loginWithGoogle(event)">🌐 Continue with Google</button>
+                
+                <button type="button" class="btn-google-sign-in" onclick="loginWithGoogle(event)">
+                    <img src="https://cdn-icons-png.flaticon.com/512/300/300221.png" alt="Google G">
+                    Continue with Google
+                </button>
+                
                 <p>Don't have an account? <a href="#" id="toggle-auth" onclick="toggleLoginMode()">Register here</a></p>
             </div>
 
             <div id="dashboard-container" class="card-container" style="display: none;">
-                <h2>Welcome to your Dashboard</h2>
-                <p>Logged in as: <strong id="user-display-email"></strong></p>
+                <h2>Dashboard</h2>
+                <p>Status: <strong style="color:var(--crimson)">Syncing with Grid...</strong></p>
+                <div style="display:flex; align-items:center; gap: 10px; margin: 15px 0;">
+                    <img id="dashboard-pfp-preview" src="https://cdn-icons-png.flaticon.com/512/149/149071.png" alt="PFP" style="width: 50px; height: 50px; border-radius: 50%;">
+                    <p>Logged in as: <strong id="user-display-email"></strong></p>
+                </div>
                 <button class="btn-danger" onclick="logOutUser()">Logout</button>
+                
                 <hr style="border-color: var(--glass-border); margin: 20px 0;">
+                
                 <form onsubmit="submitProfile(event)">
                     <div id="pfp-drop-zone" class="drop-zone">
-                        <img id="dashboard-pfp-preview" src="https://cdn-icons-png.flaticon.com/512/149/149071.png" alt="PFP">
                         <span>Drop image to change avatar</span>
                         <input type="file" id="pfp-file-input" accept="image/*" style="display:none;">
                     </div>
@@ -69,116 +81,36 @@
             </div>
         </div>
 
-        <div id="page-chatter" class="page-content full-height">
-            <div id="chatter-locked" class="card-container">
-                <h2>Chatter Access Locked</h2><p>Please log in.</p>
-                <button class="btn-primary" onclick="routeTo('home')">Go to Login</button>
-            </div>
-
-            <div id="chatter-system" class="chatter-layout" style="display: none;">
-                <div class="server-sidebar">
-                    <div class="server-icon discovery-btn" id="btn-discovery" onclick="openDiscovery()" title="Discover">🌍</div>
-                    <div style="width: 32px; height: 2px; background: #35363c; margin-bottom: 8px; border-radius: 2px;"></div>
-                    <div id="server-list"></div>
-                    <div class="server-icon add-server-btn" onclick="createServer()" title="Add Server">+</div>
-                </div>
-
-                <div class="channel-sidebar">
-                    <div class="sidebar-header">
-                        <h3 id="active-server-name">Discovery</h3>
-                        <button id="server-settings-btn" class="icon-btn" style="display:none; color: var(--dc-text-muted);" onclick="openServerSettings()">⚙️</button>
-                    </div>
-                    <div id="channel-list" class="channel-list-container"></div>
-                    <button id="add-channel-btn" class="btn-secondary" style="display:none; margin: 10px; background: #1e1f22; border:none;" onclick="createChannel()">+ Add Channel</button>
-                </div>
-
-                <div class="chat-main">
-                    <div class="chat-header">
-                        <h3 id="active-channel-name" style="color: #fff;"># Welcome</h3>
-                    </div>
-                    <div id="discovery-box" class="discovery-grid" style="display: none; padding: 20px;"></div>
-                    
-                    <div id="chat-box" class="messages-container"></div>
-                    
-                    <form id="chat-form" class="chat-input-area" style="display:none;" onsubmit="submitChat(event)">
-                        <div class="dc-input-wrapper">
-                            <span style="color: var(--dc-text-muted); font-size: 1.2rem; margin-right: 10px; cursor: pointer;">+</span>
-                            <input type="text" id="chat-input" placeholder="Message this channel...">
-                        </div>
-                    </form>
-                </div>
+        <div id="page-terms" class="page-content">
+            <div class="card-container" style="max-width: 800px;">
+                <h2>Terms of Service</h2><div id="terms-content">Loading terms...</div>
             </div>
         </div>
 
-        <div id="page-tickets" class="page-content">
-            <div id="ticket-system" class="card-container" style="display: none; max-width: 800px;">
-                <div id="list-view">
-                    <h2>Support Center</h2>
-                    <form id="ticket-form" onsubmit="submitTicket(event)" style="margin-bottom: 30px;">
-                        <input type="text" id="ticket-subject" placeholder="What do you need help with?" required>
-                        <textarea id="ticket-msg" placeholder="Describe the issue in detail..." rows="4" required></textarea>
-                        <button type="submit" class="btn-primary">Create Ticket</button>
-                    </form>
-                    <div id="ticket-list"></div>
-                </div>
-                <div id="thread-view" style="display: none;">
-                    <button class="btn-secondary" onclick="closeThreadView()">← Back to List</button>
-                    <h2 id="active-subject">Ticket Subject</h2>
-                    <div id="ticket-chat-box" class="messages-container" style="height: 300px; background: rgba(0,0,0,0.2); border-radius: 8px;"></div>
-                    <form id="ticket-chat-form" onsubmit="submitTicketChat(event)" style="display: flex; gap: 10px;">
-                        <input type="text" id="ticket-chat-input" placeholder="Type a reply..." style="flex: 1; margin-bottom: 0;" required>
-                        <button type="submit" class="btn-primary" style="width: auto;">Reply</button>
-                    </form>
-                    <div id="admin-close-area" style="display: none; margin-top: 20px;"><button class="btn-danger" style="width: 100%;" onclick="closeActiveTicket()">Close Ticket</button></div>
-                    <div id="resolution-box" style="display: none; margin-top: 20px; border-left: 4px solid var(--crimson);"><strong>Ticket Closed:</strong> <span id="resolution-text"></span></div>
-                </div>
+        <div id="page-privacy" class="page-content">
+            <div class="card-container" style="max-width: 800px;">
+                <h2>Privacy Policy</h2><div id="privacy-content">Loading privacy policy...</div>
             </div>
         </div>
     </main>
 
-    <div id="server-settings-modal" class="custom-modal-overlay">
-        <div class="custom-modal-box">
-            <div class="custom-modal-content">
-                <h3 class="custom-modal-title">Server Settings</h3>
-                <div id="server-drop-zone" class="drop-zone">
-                    <img id="server-icon-preview" src="" alt="Server Icon" style="display:none; border-radius: 10px;">
-                    <span>Drop image to set server icon</span>
-                    <input type="file" id="server-file-input" accept="image/*" style="display:none;">
-                </div>
-                <div id="server-upload-status" class="status-text"></div>
-                
-                <hr style="border-color: var(--glass-border); margin: 20px 0;">
-                <h4 style="margin: 0 0 10px 0; text-align: left;">Server Bots <span class="bot-tag">APP</span></h4>
-                <div id="bot-list" style="text-align: left; max-height: 150px; overflow-y: auto;"></div>
-                <button class="btn-secondary" style="width: 100%; margin-top: 10px;" onclick="createBot()">+ Add Custom Bot</button>
-
-                <button class="custom-modal-btn cancel" style="margin-top: 15px; width: 100%;" onclick="document.getElementById('server-settings-modal').style.display='none'">Close</button>
-            </div>
-        </div>
-    </div>
-
     <div id="custom-prompt" class="custom-modal-overlay">
-        <div class="custom-modal-box">
-            <div class="custom-modal-content">
-                <h3 id="custom-prompt-title" class="custom-modal-title">Prompt</h3>
-                <p id="custom-prompt-desc" class="custom-modal-text"></p>
-                <input type="text" id="custom-prompt-input" class="custom-modal-input" autocomplete="off">
-                <div class="custom-modal-buttons">
-                    <button id="custom-prompt-cancel" class="custom-modal-btn cancel">Cancel</button>
-                    <button id="custom-prompt-confirm" class="custom-modal-btn confirm">Confirm</button>
-                </div>
+        <div class="custom-modal-box"><div class="custom-modal-content">
+            <h3 id="custom-prompt-title" class="custom-modal-title">Prompt</h3>
+            <p id="custom-prompt-desc" class="custom-modal-text"></p>
+            <input type="text" id="custom-prompt-input" class="custom-modal-input" autocomplete="off">
+            <div class="custom-modal-buttons">
+                <button id="custom-prompt-cancel" class="custom-modal-btn cancel">Cancel</button>
+                <button id="custom-prompt-confirm" class="custom-modal-btn confirm">Confirm</button>
             </div>
-        </div>
+        </div></div>
     </div>
-
     <div id="custom-alert" class="custom-modal-overlay">
-        <div class="custom-modal-box">
-            <div class="custom-modal-content">
-                <h3 class="custom-modal-title">CrimsonFlame Alert</h3>
-                <p id="custom-alert-message" class="custom-modal-text"></p>
-                <button id="custom-alert-ok" class="custom-modal-btn confirm" style="width: 50%;">OK</button>
-            </div>
-        </div>
+        <div class="custom-modal-box"><div class="custom-modal-content">
+            <h3 class="custom-modal-title">CrimsonFlame Alert</h3>
+            <p id="custom-alert-message" class="custom-modal-text"></p>
+            <button id="custom-alert-ok" class="custom-modal-btn confirm" style="width: 50%;">OK</button>
+        </div></div>
     </div>
 
     <script type="module" src="app.js"></script>
