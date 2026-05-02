@@ -13,17 +13,17 @@
     </svg>
 
     <nav>
-        <div class="nav-logo">CrimsonFlame <span style="color:var(--text-muted); font-size:1rem;">| Dash</span></div>
+        <div class="nav-logo" onclick="window.routeTo('home')">CrimsonFlame <span style="color:var(--text-muted); font-size:1rem;">| Dash</span></div>
         <div class="nav-links">
-            <a href="index.html">← Back to Hub</a>
-            <a href="chatter.html">Chatter</a>
-            <a href="dialog.html" style="color: #93c5fd; font-weight: bold;">Dialog (Call)</a>
+            <a onclick="window.routeTo('home')" class="nav-btn">← Back to Hub</a>
+            <a onclick="window.routeTo('chatter')" class="nav-btn">Chatter</a>
+            <a onclick="window.routeTo('dialog')" class="nav-btn" style="color: #93c5fd; font-weight: bold;">Dialog (Call)</a>
         </div>
     </nav>
 
     <main id="main-content" style="display: flex; justify-content: center; align-items: start; padding-top: 40px;">
         
-        <div id="login-container" class="card-container" style="width: 100%; max-width: 500px;">
+        <div id="login-container" class="card-container" style="width: 100%; max-width: 450px;">
             <h2 id="auth-title">Account Login</h2>
             <form onsubmit="submitLogin(event)">
                 <input type="email" id="email" placeholder="Email Address" required>
@@ -31,37 +31,55 @@
                 <button type="submit" class="btn-primary">Submit</button>
             </form>
             <hr style="border-color: var(--glass-border); margin: 20px 0;">
-            
             <button type="button" class="btn-google-sign-in" onclick="loginWithGoogle(event)">
-                <img src="https://cdn-icons-png.flaticon.com/512/300/300221.png" alt="Google G">
-                Continue with Google
+                <img src="https://cdn-icons-png.flaticon.com/512/300/300221.png" alt="G"> Continue with Google
             </button>
-            
-            <p>Don't have an account? <a href="#" id="toggle-auth" onclick="toggleLoginMode()">Register here</a></p>
+            <p style="text-align:center;">Don't have an account? <a onclick="toggleLoginMode()" style="cursor: pointer;">Register here</a></p>
         </div>
 
         <div id="dashboard-container" class="card-container" style="display: none; width: 100%; max-width: 500px;">
             <h2>Dashboard</h2>
-            <p>Status: <strong style="color:var(--crimson)">Syncing with Grid...</strong></p>
-            <div style="display:flex; align-items:center; gap: 10px; margin: 15px 0;">
-                <img id="dashboard-pfp-preview" src="https://cdn-icons-png.flaticon.com/512/149/149071.png" alt="PFP" style="width: 50px; height: 50px; border-radius: 50%;">
-                <p>Logged in as: <strong id="user-display-email"></strong></p>
+            <div style="display:flex; align-items:center; gap: 15px; margin: 20px 0;">
+                <img id="dashboard-pfp-preview" src="https://cdn-icons-png.flaticon.com/512/149/149071.png" style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover; border: 1px solid var(--glass-border);">
+                <div>
+                    <p style="margin:0; color:var(--text-muted);">Logged in as:</p>
+                    <strong id="user-display-email" style="font-size:1.1rem;"></strong>
+                </div>
             </div>
-            <button class="btn-danger" onclick="logOutUser()">Logout</button>
+            <button class="btn-danger" style="width:auto;" onclick="logOutUser()">Logout</button>
             
             <hr style="border-color: var(--glass-border); margin: 20px 0;">
-            
             <form onsubmit="submitProfile(event)">
                 <div id="pfp-drop-zone" class="drop-zone">
-                    <span>Drop image to change avatar</span>
+                    <span>Drop new image to change avatar</span>
                     <input type="file" id="pfp-file-input" accept="image/*" style="display:none;">
                 </div>
                 <div id="upload-status" class="status-text"></div>
                 <input type="text" id="display-name" placeholder="Display Name">
                 <button type="submit" class="btn-primary">Save Profile Info</button>
             </form>
-        </div>
 
+            <hr style="border-color: var(--glass-border); margin: 20px 0;">
+            <h3 style="color: #5865F2; margin-top: 0; display: flex; align-items: center; gap: 8px;">
+                <img src="https://assets-global.website-files.com/6257adef93867e50d84d30e2/636e0a6a49cf127bf92de1e2_icon_clyde_blurple_RGB.png" style="width: 24px;"> 
+                Discord Integration
+            </h3>
+            
+            <div id="discord-unlinked" style="display: none;">
+                <p style="color: var(--text-muted); font-size: 0.9rem;">Link your Discord account via the bot to sync your data.</p>
+                <button class="btn-secondary" onclick="generateDiscordLinkCode()" style="background: #5865F2; color: white; border: none; width: 100%;">Generate Link Code</button>
+                <p id="discord-link-code-display" style="display: none; text-align: center; font-size: 1.1rem; font-family: monospace; background: rgba(0,0,0,0.5); padding: 15px; border-radius: 8px; color: #4ade80; border: 1px dashed #5865F2; margin-top: 10px;"></p>
+            </div>
+            
+            <div id="discord-linked" style="display: none; align-items: center; gap: 12px; background: rgba(88, 101, 242, 0.1); border: 1px solid #5865F2; padding: 15px; border-radius: 12px;">
+                <img id="discord-avatar" src="" style="width: 45px; height: 45px; border-radius: 50%; border: 2px solid #5865F2;">
+                <div>
+                    <p style="margin: 0; color: #a1a1aa; font-size: 0.75rem; text-transform: uppercase; font-weight: bold;">Linked Account</p>
+                    <strong id="discord-username" style="color: #fff; font-size: 1.1rem;"></strong>
+                </div>
+                <button class="btn-danger" style="margin-left: auto; width: auto; padding: 8px 12px; font-size: 0.8rem; background: rgba(220, 20, 60, 0.2); border: 1px solid var(--crimson);" onclick="unlinkDiscord()">Unlink</button>
+            </div>
+        </div>
     </main>
 
     <div id="custom-prompt" class="custom-modal-overlay">
