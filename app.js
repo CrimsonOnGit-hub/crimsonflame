@@ -354,7 +354,6 @@ window.selectChannel = function(id, name, el) {
                         if(b.graph?.drawflow?.Home?.data) {
                             Object.values(b.graph.drawflow.Home.data).forEach(n => {
                                 if(n.name === 'trigger' && n.data.keyword?.startsWith('/')) {
-                                    // Extract the base command if it has variables (e.g. "/spawn {item}" -> "/spawn")
                                     let baseCmd = n.data.keyword.split(' ')[0];
                                     if(baseCmd.toLowerCase().startsWith(val.split(' ')[0].toLowerCase())) {
                                         cmds.push({ name: b.name, pfp: b.pfp || DEFAULT_PFP, cmd: n.data.keyword });
@@ -400,7 +399,6 @@ window.selectChannel = function(id, name, el) {
     });
 };
 
-// MASSIVE UPDATE: Full Node Interpreter with Variable Injection
 window.submitChat = async function(e) {
     e.preventDefault(); 
     const inp = document.getElementById('chat-input'); 
@@ -431,14 +429,12 @@ window.submitChat = async function(e) {
                         let keyword = n.data.keyword || '';
                         let isMatch = false;
                         
-                        // Internal bot state passed between nodes
                         let state = {
                             user: currentUser.displayName || "User",
                             message: text,
                             vars: {}
                         };
 
-                        // Check if the trigger uses variables (e.g. /give {item})
                         if (keyword.includes('{') && keyword.includes('}')) {
                             let regexPattern = keyword.replace(/[-[\]/()*.+?^$\\|]/g, "\\$&");
                             regexPattern = regexPattern.replace(/\\\{(\w+)\\\}/g, "(?<$1>.+)");
@@ -454,7 +450,6 @@ window.submitChat = async function(e) {
                                     }
                                 }
                             } catch(e) {
-                                // Fallback if regex construction fails
                                 if (text.toLowerCase().includes(keyword.toLowerCase())) isMatch = true;
                             }
                         } else {
@@ -462,13 +457,10 @@ window.submitChat = async function(e) {
                         }
 
                         if (isMatch) {
-                            
-                            // Recursive interpreter to traverse connected nodes
                             const traverse = async (nodeId) => {
                                 const node = nodes[nodeId];
                                 if (!node) return;
 
-                                // System to inject variables into fields dynamically
                                 const replaceVars = (str) => {
                                     if (!str) return str;
                                     let res = str.replace(/\{user\}/gi, state.user).replace(/\{message\}/gi, state.message);
@@ -540,7 +532,6 @@ window.submitChat = async function(e) {
                                     }
                                 }
 
-                                // Recursively process the next connected nodes
                                 for (let outputKey in node.outputs) {
                                     const conns = node.outputs[outputKey].connections;
                                     for (let conn of conns) {
@@ -549,7 +540,6 @@ window.submitChat = async function(e) {
                                 }
                             };
 
-                            // Start sequence from trigger's outputs
                             if (n.outputs['output_1']) {
                                 for (let conn of n.outputs['output_1'].connections) {
                                     traverse(conn.node);
@@ -637,7 +627,6 @@ window.startVisualBotBuilder = function(id = null) {
 
 window.cancelBotBuild = function() { document.getElementById('server-settings-main-view').style.display = 'block'; document.getElementById('bot-builder-ui').style.display = 'none'; };
 
-// Notice that outputs are now set to '1' for all actions so they can be chained indefinitely
 window.addBotNode = function(t) {
     if(t==='trigger') window.botEditor.addNode('trigger', 0, 1, 50, 100, 'trigger', {keyword:''}, `<div><div class="title-box">Trigger</div><input type="text" df-keyword placeholder="Keyword (e.g. /give {item})..."></div>`);
     else if(t==='action') window.botEditor.addNode('action', 1, 1, 350, 50, 'action', {reply:''}, `<div><div class="title-box">Action</div><input type="text" df-reply placeholder="Reply..."></div>`);
