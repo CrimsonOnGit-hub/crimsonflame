@@ -25,11 +25,9 @@ let currentUser = null;
 let isGlobalAdmin = false; 
 let isLogin = true;
 
-// Page Detection
 const currentPage = window.location.pathname.split('/').pop() || 'index.html';
 const isIndex = currentPage === 'index.html' || currentPage === '';
 
-// --- ROUTING FOR MULTI-PAGE ARCHITECTURE ---
 window.routeTo = function(page) {
     if (page === 'home' || page === 'updates' || page === 'terms' || page === 'privacy') {
         if (!isIndex) {
@@ -53,7 +51,6 @@ window.routeTo = function(page) {
     }
 };
 
-// --- OAUTH LOGIC ---
 const urlParams = new URLSearchParams(window.location.search);
 const oauthAppName = urlParams.get('app_name');
 const oauthRedirectUri = urlParams.get('redirect_uri');
@@ -90,7 +87,6 @@ window.approveOAuth = function() {
     window.location.href = `${oauthRedirectUri}?cf_auth=success&user_data=${encodeURIComponent(JSON.stringify(userData))}`;
 };
 
-// --- GLOBAL UTILS ---
 window.showCustomPrompt = function(title, desc, placeholder, onConfirm) {
     const overlay = document.getElementById('custom-prompt'); if(!overlay) return;
     const input = document.getElementById('custom-prompt-input');
@@ -110,15 +106,21 @@ window.showCustomAlert = function(message) {
 };
 
 function showResponseText(element, type, text) {
-    const statusDiv = document.createElement('div'); statusDiv.className = `status-text ${type}`; statusDiv.innerText = text; statusDiv.style.display = 'block';
-    element.parentNode.insertBefore(statusDiv, element.nextSibling); setTimeout(() => statusDiv.remove(), 4000); 
+    const existing = element.parentNode.querySelectorAll('.status-text');
+    existing.forEach(el => el.remove());
+
+    const statusDiv = document.createElement('div'); 
+    statusDiv.className = `status-text ${type}`; 
+    statusDiv.innerText = text; 
+    statusDiv.style.display = 'block';
+    element.parentNode.insertBefore(statusDiv, element.nextSibling); 
+    setTimeout(() => statusDiv.remove(), 4000); 
 }
 
 function formatTime(timestamp) {
     if(!timestamp) return 'Just now'; return timestamp.toDate().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
 }
 
-// --- AUTH & DASHBOARD LOGIC ---
 window.submitLogin = async function(e) {
     e.preventDefault(); const btn = e.target.querySelector('button[type="submit"]'); btn.disabled = true; btn.innerText = "Processing...";
     try {
@@ -160,7 +162,7 @@ window.submitProfile = async function(e) {
                 const lastChange = userData.lastUsernameChange.toDate();
                 const daysSince = (new Date() - lastChange) / (1000 * 60 * 60 * 24);
                 if (daysSince < 30) {
-                    throw new Error(`Usernames can only be changed once every 30 days. (${Math.ceil(30 - daysSince)} days left)`);
+                    throw new Error(`Usernames can only be changed once every 30 days. You have ${Math.ceil(30 - daysSince)} days left.`);
                 }
             }
 
@@ -178,7 +180,8 @@ window.submitProfile = async function(e) {
         await setDoc(userRef, updates, { merge: true });
         showResponseText(btn, 'success', "Profile Saved!");
     } catch (err) {
-        showResponseText(btn, 'error', err.message);
+        window.showCustomAlert(err.message);
+        showResponseText(btn, 'error', "Update Blocked.");
     } finally {
         btn.disabled = false; 
         btn.innerText = "Save Profile Info";
@@ -188,7 +191,6 @@ window.submitProfile = async function(e) {
 window.logOutUser = function() { signOut(auth); window.routeTo('home'); };
 window.toggleLoginMode = function() { isLogin = !isLogin; document.getElementById('auth-title').innerText = isLogin ? "Login" : "Register"; document.getElementById('toggle-auth').innerText = isLogin ? "Register here" : "Login here"; };
 
-// --- DISCORD INTEGRATION ---
 window.generateDiscordLinkCode = async function() {
     if(!currentUser) return;
     const code = Math.floor(100000 + Math.random() * 900000).toString(); 
@@ -270,7 +272,6 @@ onAuthStateChanged(auth, user => {
     }
 });
 
-// --- PUBLIC DATA ---
 window.fetchHomeImages = async function() {
     const gal = document.getElementById('home-gallery'); if(!gal) return;
     try {
@@ -292,7 +293,6 @@ window.submitNews = async function(e) {
 window.fetchTerms = async function() { const box = document.getElementById('terms-content'); if(!box) return; try { const res = await fetch('terms.md'); box.innerHTML = marked.parse(await res.text()); } catch(e) { box.innerHTML = "Error"; } };
 window.fetchPrivacy = async function() { const box = document.getElementById('privacy-content'); if(!box) return; try { const res = await fetch('privacy.md'); box.innerHTML = marked.parse(await res.text()); } catch(e) { box.innerHTML = "Error"; } };
 
-// --- CHATTER SYSTEM ---
 let activeServerId = null; let activeServerData = null; let activeChannelId = null;
 let chatterServersUnsub = null; let chatterChannelsUnsub = null; let chatterMessagesUnsub = null;
 
@@ -336,6 +336,55 @@ window.selectChannel = function(id, name, el) {
     document.getElementById('active-channel-name').innerText = `# ${name}`; document.getElementById('chat-form').style.display = 'block';
     document.querySelectorAll('.channel-item').forEach(e => e.classList.remove('active')); if(el) el.classList.add('active');
 
+    const chatForm = document.getElementById('chat-form');
+    if(chatForm && !document.getElementById('slash-menu-container')) {
+        const slashMenu = document.createElement('div');
+        slashMenu.id = 'slash-menu-container';
+        slashMenu.style.cssText = "display:none; position:absolute; bottom:100%; left:0; width:100%; max-width:400px; background:#2b2d31; border:1px solid #1e1f22; border-radius:8px; z-index:100; margin-bottom:10px; max-height:200px; overflow-y:auto; box-shadow:0 8px 16px rgba(0,0,0,0.3); padding:5px;";
+        chatForm.style.position = 'relative';
+        chatForm.insertBefore(slashMenu, chatForm.firstChild);
+        
+        const inp = document.getElementById('chat-input');
+        inp.addEventListener('input', (e) => {
+            const val = e.target.value;
+            if(val.startsWith('/')) {
+                let cmds = [];
+                if(activeServerData && activeServerData.bots) {
+                    activeServerData.bots.forEach(b => {
+                        if(b.graph?.drawflow?.Home?.data) {
+                            Object.values(b.graph.drawflow.Home.data).forEach(n => {
+                                if(n.name === 'trigger' && n.data.keyword?.startsWith('/')) {
+                                    if(n.data.keyword.toLowerCase().startsWith(val.toLowerCase())) {
+                                        cmds.push({ name: b.name, pfp: b.pfp || DEFAULT_PFP, cmd: n.data.keyword });
+                                    }
+                                }
+                            });
+                        }
+                    });
+                }
+                if(cmds.length > 0) {
+                    slashMenu.innerHTML = cmds.map(c => `
+                        <div style="display:flex; align-items:center; gap:10px; padding:8px; cursor:pointer; border-radius:4px;" 
+                             onmouseover="this.style.background='#3f4147'" 
+                             onmouseout="this.style.background='transparent'"
+                             onclick="document.getElementById('chat-input').value='${c.cmd} '; document.getElementById('slash-menu-container').style.display='none'; document.getElementById('chat-input').focus();">
+                            <img src="${c.pfp}" style="width:30px; height:30px; border-radius:50%; object-fit:cover;">
+                            <div style="line-height:1.2;">
+                                <strong style="color:white; font-size:14px;">${c.cmd}</strong><br>
+                                <span style="color:#a1a1aa; font-size:11px;">${c.name} APP</span>
+                            </div>
+                        </div>
+                    `).join('');
+                    slashMenu.style.display = 'block';
+                } else {
+                    slashMenu.style.display = 'none';
+                }
+            } else {
+                slashMenu.style.display = 'none';
+            }
+        });
+    }
+
     if(chatterMessagesUnsub) chatterMessagesUnsub();
     const box = document.getElementById('chat-box'); box.innerHTML = "";
     chatterMessagesUnsub = onSnapshot(query(collection(db, "discord_servers", activeServerId, "channels", id, "messages"), orderBy("timestamp", "asc")), snap => {
@@ -356,6 +405,9 @@ window.submitChat = async function(e) {
     
     if(!text || !currentUser || !activeServerId || !activeChannelId) return;
     
+    const sMenu = document.getElementById('slash-menu-container');
+    if(sMenu) sMenu.style.display = 'none';
+
     const ref = collection(db, "discord_servers", activeServerId, "channels", activeChannelId, "messages");
     
     await addDoc(ref, { 
@@ -379,14 +431,13 @@ window.submitChat = async function(e) {
                                 setTimeout(() => addDoc(ref, { 
                                     text: next.data.reply, 
                                     senderName: bot.name, 
-                                    senderPfp: 'https://cdn-icons-png.flaticon.com/512/4712/4712035.png', 
+                                    senderPfp: bot.pfp || 'https://cdn-icons-png.flaticon.com/512/4712/4712035.png', 
                                     isBot: true, 
                                     timestamp: serverTimestamp() 
                                 }), 600);
                             } 
                             else if (next?.name === 'code' && next.data.url && next.data.code) {
-                                // SECURE FETCH: Hits Discloud API, token remains hidden.
-                                fetch(`https://https://crimsonflame-api.discloud.app/api/send_discord`, {
+                                fetch(`https://YOUR_DISCLOUD_URL_HERE/api/send_discord`, {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ 
@@ -398,14 +449,59 @@ window.submitChat = async function(e) {
                                 .then(data => {
                                     if(data.success) {
                                         addDoc(ref, { 
-                                            text: `*System: ${bot.name} successfully pushed logic to Discord via API.*`, 
+                                            text: `*System: ${bot.name} successfully pushed logic to Discord API.*`, 
                                             senderName: bot.name, 
-                                            senderPfp: 'https://cdn-icons-png.flaticon.com/512/4712/4712035.png', 
+                                            senderPfp: bot.pfp || 'https://cdn-icons-png.flaticon.com/512/4712/4712035.png', 
                                             isBot: true, 
                                             timestamp: serverTimestamp() 
                                         });
                                     }
                                 }).catch(()=>{});
+                            }
+                            else if (next?.name === 'discord_webhook' && next.data.url && next.data.code) {
+                                fetch(next.data.url, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        content: next.data.code,
+                                        username: bot.name,
+                                        avatar_url: bot.pfp || 'https://cdn-icons-png.flaticon.com/512/4712/4712035.png'
+                                    })
+                                })
+                                .then(res => {
+                                    if(res.ok) {
+                                        addDoc(ref, { 
+                                            text: `*System: ${bot.name} successfully triggered a Discord Webhook.*`, 
+                                            senderName: bot.name, 
+                                            senderPfp: bot.pfp || 'https://cdn-icons-png.flaticon.com/512/4712/4712035.png', 
+                                            isBot: true, 
+                                            timestamp: serverTimestamp() 
+                                        });
+                                    }
+                                }).catch(()=>{});
+                            }
+                            else if (next?.name === 'webhook' && next.data.url && next.data.payload) {
+                                try {
+                                    let payloadData = JSON.parse(next.data.payload);
+                                    fetch(next.data.url, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify(payloadData)
+                                    })
+                                    .then(res => {
+                                        if(res.ok) {
+                                            addDoc(ref, { 
+                                                text: `*System: ${bot.name} successfully triggered a generic server webhook.*`, 
+                                                senderName: bot.name, 
+                                                senderPfp: bot.pfp || 'https://cdn-icons-png.flaticon.com/512/4712/4712035.png', 
+                                                isBot: true, 
+                                                timestamp: serverTimestamp() 
+                                            });
+                                        }
+                                    }).catch(()=>{});
+                                } catch(e) {
+                                    console.error("Invalid JSON payload for webhook node.");
+                                }
                             }
                         });
                     }
@@ -434,7 +530,6 @@ window.joinServer = async function(id) { await updateDoc(doc(db, "discord_server
 window.createServer = async function() { window.showCustomPrompt("Create Server", "Name:", "Name...", async (n) => { const s = await addDoc(collection(db, "discord_servers"), { name: n, owner: currentUser.uid, members: [currentUser.uid], admins: [currentUser.uid], timestamp: serverTimestamp() }); await addDoc(collection(db, "discord_servers", s.id, "channels"), { name: "general", timestamp: serverTimestamp() }); }); };
 window.createChannel = async function() { window.showCustomPrompt("Add Channel", "Name:", "Name...", async (n) => { await addDoc(collection(db, "discord_servers", activeServerId, "channels"), { name: n.toLowerCase().replace(/\s+/g, '-'), timestamp: serverTimestamp() }); }); };
 
-// --- VISUAL BOTS ---
 window.botEditor = null; window.editingBotId = null;
 window.openServerSettings = async function() {
     document.getElementById('server-settings-main-view').style.display = 'block'; document.getElementById('bot-builder-ui').style.display = 'none';
@@ -452,27 +547,73 @@ window.renderBotList = function() {
         <button class="btn-danger" style="padding:5px;" onclick="deleteBot('${b.id}')">Delete</button></div></div>`;
     });
 };
+
 window.startVisualBotBuilder = function(id = null) {
     document.getElementById('server-settings-main-view').style.display = 'none'; document.getElementById('bot-builder-ui').style.display = 'flex';
+    
+    if (!document.getElementById('botPfp')) {
+        const nameInput = document.getElementById('botName');
+        if (nameInput) {
+            const pfpInput = document.createElement('input');
+            pfpInput.type = 'text';
+            pfpInput.id = 'botPfp';
+            pfpInput.placeholder = 'Bot PFP Image URL...';
+            pfpInput.style.marginLeft = '10px';
+            pfpInput.style.padding = '8px';
+            pfpInput.style.borderRadius = '5px';
+            pfpInput.style.border = '1px solid #1e1f22';
+            pfpInput.style.background = 'rgba(0,0,0,0.2)';
+            pfpInput.style.color = 'white';
+            nameInput.parentNode.insertBefore(pfpInput, nameInput.nextSibling);
+        }
+    }
+
     const c = document.getElementById('drawflow-container'); c.innerHTML = ""; window.botEditor = new Drawflow(c); window.botEditor.start(); window.editingBotId = id;
-    if(id) { const b = activeServerData.bots.find(x => x.id === id); if(b) { document.getElementById('botName').value = b.name; try{window.botEditor.import(b.graph);}catch(e){} } } else { document.getElementById('botName').value = ""; }
+    
+    if(id) { 
+        const b = activeServerData.bots.find(x => x.id === id); 
+        if(b) { 
+            document.getElementById('botName').value = b.name; 
+            if(document.getElementById('botPfp')) document.getElementById('botPfp').value = b.pfp || '';
+            try{window.botEditor.import(b.graph);}catch(e){} 
+        } 
+    } else { 
+        document.getElementById('botName').value = ""; 
+        if(document.getElementById('botPfp')) document.getElementById('botPfp').value = "";
+    }
 };
+
 window.cancelBotBuild = function() { document.getElementById('server-settings-main-view').style.display = 'block'; document.getElementById('bot-builder-ui').style.display = 'none'; };
+
 window.addBotNode = function(t) {
-    if(t==='trigger') window.botEditor.addNode('trigger', 0, 1, 50, 100, 'trigger', {keyword:''}, `<div><div class="title-box">📥 Trigger</div><input type="text" df-keyword placeholder="Keyword..."></div>`);
-    else if(t==='action') window.botEditor.addNode('action', 1, 0, 350, 50, 'action', {reply:''}, `<div><div class="title-box">📤 Action</div><input type="text" df-reply placeholder="Reply..."></div>`);
-    else if(t==='code') window.botEditor.addNode('code', 1, 0, 350, 200, 'code', {url:'',code:''}, `<div><div class="title-box">⚙️ Discord Send</div><input type="text" df-url placeholder="Channel ID..."><input type="text" df-code placeholder="Message..."></div>`);
+    if(t==='trigger') window.botEditor.addNode('trigger', 0, 1, 50, 100, 'trigger', {keyword:''}, `<div><div class="title-box">Trigger</div><input type="text" df-keyword placeholder="Keyword (e.g. /spawn)..."></div>`);
+    else if(t==='action') window.botEditor.addNode('action', 1, 0, 350, 50, 'action', {reply:''}, `<div><div class="title-box">Action</div><input type="text" df-reply placeholder="Reply..."></div>`);
+    else if(t==='code') window.botEditor.addNode('code', 1, 0, 350, 200, 'code', {url:'',code:''}, `<div><div class="title-box">Discord API Send</div><input type="text" df-url placeholder="Discord Channel ID..."><input type="text" df-code placeholder="Message..."></div>`);
+    else if(t==='discord_webhook') window.botEditor.addNode('discord_webhook', 1, 0, 350, 350, 'discord_webhook', {url:'', code:''}, `<div><div class="title-box">Discord Webhook</div><input type="text" df-url placeholder="Webhook URL..."><textarea df-code placeholder="Message content..." style="width:100%; margin-top:5px; background:rgba(0,0,0,0.2); color:white; border:none; padding:5px; resize:vertical;"></textarea></div>`);
+    else if(t==='webhook') window.botEditor.addNode('webhook', 1, 0, 350, 500, 'webhook', {url:'', payload:''}, `<div><div class="title-box">Generic Webhook</div><input type="text" df-url placeholder="URL (e.g. Unity Server)..."><textarea df-payload placeholder='{"command": "spawn", "item": "sword"}' style="width:100%; margin-top:5px; background:rgba(0,0,0,0.2); color:white; border:none; padding:5px; resize:vertical;"></textarea></div>`);
 };
+
 window.saveVisualBot = async function() {
-    const n = document.getElementById('botName').value.trim(); if(!n) return window.showCustomAlert("Need a name!");
+    const n = document.getElementById('botName').value.trim(); 
+    const p = document.getElementById('botPfp') ? document.getElementById('botPfp').value.trim() : '';
+    if(!n) return window.showCustomAlert("Need a name!");
+    
     const g = window.botEditor.export(); let bots = activeServerData.bots ? [...activeServerData.bots] : [];
-    if(window.editingBotId) { const i = bots.findIndex(x=>x.id===window.editingBotId); if(i>-1) bots[i] = {id:window.editingBotId, name:n, graph:g}; }
-    else { bots.push({id:Date.now().toString(), name:n, graph:g}); }
-    await updateDoc(doc(db, "discord_servers", activeServerId), { bots }); window.showCustomAlert("Saved!"); window.cancelBotBuild(); window.openServerSettings();
+    
+    if(window.editingBotId) { 
+        const i = bots.findIndex(x=>x.id===window.editingBotId); 
+        if(i>-1) bots[i] = {id:window.editingBotId, name:n, pfp:p, graph:g}; 
+    } else { 
+        bots.push({id:Date.now().toString(), name:n, pfp:p, graph:g}); 
+    }
+    
+    await updateDoc(doc(db, "discord_servers", activeServerId), { bots }); 
+    window.showCustomAlert("Saved!"); 
+    window.cancelBotBuild(); 
+    window.openServerSettings();
 };
 window.deleteBot = async function(id) { await updateDoc(doc(db, "discord_servers", activeServerId), { bots: arrayRemove(activeServerData.bots.find(x=>x.id===id)) }); window.openServerSettings(); };
 
-// --- SUPPORT TICKETS ---
 let activeTicketId = null; let ticketChatUnsubscribe = null;
 window.fetchTickets = async function() {
     if(!currentUser) return;
@@ -509,7 +650,6 @@ window.closeThreadView = () => { document.getElementById('list-view').style.disp
 window.closeActiveTicket = () => { window.showCustomPrompt("Close", "Reason:", "Reason...", async (r) => { await updateDoc(doc(db, "tickets", activeTicketId), { status: "Closed", closeReason: r }); window.closeThreadView(); }); };
 window.submitTicketChat = async function(e) { e.preventDefault(); const inp = document.getElementById('ticket-chat-input'); await addDoc(collection(db, "tickets", activeTicketId, "messages"), { text: inp.value, sender: currentUser.email, senderName: currentUser.displayName, timestamp: serverTimestamp() }); inp.value = ""; };
 
-// --- IMAGE UPLOAD ---
 document.querySelectorAll('.drop-zone').forEach(zone => {
     const input = zone.querySelector('input[type="file"]'); if(!input) return;
     zone.onclick = () => input.click();
@@ -539,7 +679,6 @@ async function handleUpload(file, sourceId) {
     setTimeout(() => { if(sEl) sEl.style.display = 'none'; }, 3000);
 }
 
-// Init
 setTimeout(() => {
     if (isIndex && window.location.hash) {
         const hash = window.location.hash.replace('#', '');
