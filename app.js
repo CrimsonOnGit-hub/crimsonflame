@@ -354,7 +354,9 @@ window.selectChannel = function(id, name, el) {
                         if(b.graph?.drawflow?.Home?.data) {
                             Object.values(b.graph.drawflow.Home.data).forEach(n => {
                                 if(n.name === 'trigger' && n.data.keyword?.startsWith('/')) {
-                                    if(n.data.keyword.toLowerCase().startsWith(val.toLowerCase())) {
+                                    // Extract the base command if it has variables (e.g. "/spawn {item}" -> "/spawn")
+                                    let baseCmd = n.data.keyword.split(' ')[0];
+                                    if(baseCmd.toLowerCase().startsWith(val.split(' ')[0].toLowerCase())) {
                                         cmds.push({ name: b.name, pfp: b.pfp || DEFAULT_PFP, cmd: n.data.keyword });
                                     }
                                 }
@@ -367,7 +369,7 @@ window.selectChannel = function(id, name, el) {
                         <div style="display:flex; align-items:center; gap:10px; padding:8px; cursor:pointer; border-radius:4px;" 
                              onmouseover="this.style.background='#3f4147'" 
                              onmouseout="this.style.background='transparent'"
-                             onclick="document.getElementById('chat-input').value='${c.cmd} '; document.getElementById('slash-menu-container').style.display='none'; document.getElementById('chat-input').focus();">
+                             onclick="document.getElementById('chat-input').value='${c.cmd.split(' ')[0]} '; document.getElementById('slash-menu-container').style.display='none'; document.getElementById('chat-input').focus();">
                             <img src="${c.pfp}" style="width:30px; height:30px; border-radius:50%; object-fit:cover;">
                             <div style="line-height:1.2;">
                                 <strong style="color:white; font-size:14px;">${c.cmd}</strong><br>
@@ -398,6 +400,7 @@ window.selectChannel = function(id, name, el) {
     });
 };
 
+// MASSIVE UPDATE: Full Node Interpreter with Variable Injection
 window.submitChat = async function(e) {
     e.preventDefault(); 
     const inp = document.getElementById('chat-input'); 
@@ -424,86 +427,135 @@ window.submitChat = async function(e) {
             if (bot.graph?.drawflow?.Home?.data) {
                 const nodes = bot.graph.drawflow.Home.data;
                 Object.values(nodes).forEach(n => {
-                    if (n.name === 'trigger' && text.toLowerCase().includes(n.data.keyword?.toLowerCase())) {
-                        n.outputs['output_1'].connections.forEach(conn => {
-                            const next = nodes[conn.node];
-                            if (next?.name === 'action' && next.data.reply) {
-                                setTimeout(() => addDoc(ref, { 
-                                    text: next.data.reply, 
-                                    senderName: bot.name, 
-                                    senderPfp: bot.pfp || 'https://cdn-icons-png.flaticon.com/512/4712/4712035.png', 
-                                    isBot: true, 
-                                    timestamp: serverTimestamp() 
-                                }), 600);
-                            } 
-                            else if (next?.name === 'code' && next.data.url && next.data.code) {
-                                fetch(`https://YOUR_DISCLOUD_URL_HERE/api/send_discord`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ 
-                                        channelId: next.data.url,
-                                        message: next.data.code
-                                    })
-                                })
-                                .then(res => res.json())
-                                .then(data => {
-                                    if(data.success) {
-                                        addDoc(ref, { 
-                                            text: `*System: ${bot.name} successfully pushed logic to Discord API.*`, 
-                                            senderName: bot.name, 
-                                            senderPfp: bot.pfp || 'https://cdn-icons-png.flaticon.com/512/4712/4712035.png', 
-                                            isBot: true, 
-                                            timestamp: serverTimestamp() 
-                                        });
+                    if (n.name === 'trigger') {
+                        let keyword = n.data.keyword || '';
+                        let isMatch = false;
+                        
+                        // Internal bot state passed between nodes
+                        let state = {
+                            user: currentUser.displayName || "User",
+                            message: text,
+                            vars: {}
+                        };
+
+                        // Check if the trigger uses variables (e.g. /give {item})
+                        if (keyword.includes('{') && keyword.includes('}')) {
+                            let regexPattern = keyword.replace(/[-[\]/()*.+?^$\\|]/g, "\\$&");
+                            regexPattern = regexPattern.replace(/\\\{(\w+)\\\}/g, "(?<$1>.+)");
+                            try {
+                                let regex = new RegExp(`^${regexPattern}`, "i");
+                                let match = text.match(regex);
+                                if (match) {
+                                    isMatch = true;
+                                    if (match.groups) {
+                                        for (let key in match.groups) {
+                                            state.vars[key] = match.groups[key].trim();
+                                        }
                                     }
-                                }).catch(()=>{});
+                                }
+                            } catch(e) {
+                                // Fallback if regex construction fails
+                                if (text.toLowerCase().includes(keyword.toLowerCase())) isMatch = true;
                             }
-                            else if (next?.name === 'discord_webhook' && next.data.url && next.data.code) {
-                                fetch(next.data.url, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                        content: next.data.code,
-                                        username: bot.name,
-                                        avatar_url: bot.pfp || 'https://cdn-icons-png.flaticon.com/512/4712/4712035.png'
-                                    })
-                                })
-                                .then(res => {
-                                    if(res.ok) {
-                                        addDoc(ref, { 
-                                            text: `*System: ${bot.name} successfully triggered a Discord Webhook.*`, 
-                                            senderName: bot.name, 
-                                            senderPfp: bot.pfp || 'https://cdn-icons-png.flaticon.com/512/4712/4712035.png', 
-                                            isBot: true, 
-                                            timestamp: serverTimestamp() 
-                                        });
+                        } else {
+                            if (keyword && text.toLowerCase().includes(keyword.toLowerCase())) isMatch = true;
+                        }
+
+                        if (isMatch) {
+                            
+                            // Recursive interpreter to traverse connected nodes
+                            const traverse = async (nodeId) => {
+                                const node = nodes[nodeId];
+                                if (!node) return;
+
+                                // System to inject variables into fields dynamically
+                                const replaceVars = (str) => {
+                                    if (!str) return str;
+                                    let res = str.replace(/\{user\}/gi, state.user).replace(/\{message\}/gi, state.message);
+                                    for (let key in state.vars) {
+                                        res = res.replace(new RegExp(`\\{${key}\\}`, 'gi'), state.vars[key]);
                                     }
-                                }).catch(()=>{});
-                            }
-                            else if (next?.name === 'webhook' && next.data.url && next.data.payload) {
-                                try {
-                                    let payloadData = JSON.parse(next.data.payload);
-                                    fetch(next.data.url, {
+                                    return res;
+                                };
+
+                                if (node.name === 'action' && node.data.reply) {
+                                    setTimeout(() => addDoc(ref, { 
+                                        text: replaceVars(node.data.reply), 
+                                        senderName: bot.name, 
+                                        senderPfp: bot.pfp || 'https://cdn-icons-png.flaticon.com/512/4712/4712035.png', 
+                                        isBot: true, 
+                                        timestamp: serverTimestamp() 
+                                    }), 600);
+                                } 
+                                else if (node.name === 'set_variable' && node.data.var_name) {
+                                    state.vars[node.data.var_name] = replaceVars(node.data.var_value);
+                                }
+                                else if (node.name === 'code' && node.data.url && node.data.code) {
+                                    fetch(`https://YOUR_DISCLOUD_URL_HERE/api/send_discord`, {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify(payloadData)
+                                        body: JSON.stringify({ 
+                                            channelId: replaceVars(node.data.url),
+                                            message: replaceVars(node.data.code)
+                                        })
+                                    })
+                                    .then(res => res.json())
+                                    .then(data => {
+                                        if(data.success) {
+                                            addDoc(ref, { text: `System: ${bot.name} pushed logic to Discord API.`, senderName: bot.name, senderPfp: bot.pfp || 'https://cdn-icons-png.flaticon.com/512/4712/4712035.png', isBot: true, timestamp: serverTimestamp() });
+                                        }
+                                    }).catch(()=>{});
+                                }
+                                else if (node.name === 'discord_webhook' && node.data.url && node.data.code) {
+                                    fetch(replaceVars(node.data.url), {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({
+                                            content: replaceVars(node.data.code),
+                                            username: bot.name,
+                                            avatar_url: bot.pfp || 'https://cdn-icons-png.flaticon.com/512/4712/4712035.png'
+                                        })
                                     })
                                     .then(res => {
                                         if(res.ok) {
-                                            addDoc(ref, { 
-                                                text: `*System: ${bot.name} successfully triggered a generic server webhook.*`, 
-                                                senderName: bot.name, 
-                                                senderPfp: bot.pfp || 'https://cdn-icons-png.flaticon.com/512/4712/4712035.png', 
-                                                isBot: true, 
-                                                timestamp: serverTimestamp() 
-                                            });
+                                            addDoc(ref, { text: `System: ${bot.name} triggered a Discord Webhook.`, senderName: bot.name, senderPfp: bot.pfp || 'https://cdn-icons-png.flaticon.com/512/4712/4712035.png', isBot: true, timestamp: serverTimestamp() });
                                         }
                                     }).catch(()=>{});
-                                } catch(e) {
-                                    console.error("Invalid JSON payload for webhook node.");
+                                }
+                                else if (node.name === 'webhook' && node.data.url && node.data.payload) {
+                                    try {
+                                        let payloadData = JSON.parse(replaceVars(node.data.payload));
+                                        fetch(replaceVars(node.data.url), {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify(payloadData)
+                                        })
+                                        .then(res => {
+                                            if(res.ok) {
+                                                addDoc(ref, { text: `System: ${bot.name} triggered a generic server webhook.`, senderName: bot.name, senderPfp: bot.pfp || 'https://cdn-icons-png.flaticon.com/512/4712/4712035.png', isBot: true, timestamp: serverTimestamp() });
+                                            }
+                                        }).catch(()=>{});
+                                    } catch(e) {
+                                        console.error("Invalid JSON payload for webhook node.");
+                                    }
+                                }
+
+                                // Recursively process the next connected nodes
+                                for (let outputKey in node.outputs) {
+                                    const conns = node.outputs[outputKey].connections;
+                                    for (let conn of conns) {
+                                        await traverse(conn.node);
+                                    }
+                                }
+                            };
+
+                            // Start sequence from trigger's outputs
+                            if (n.outputs['output_1']) {
+                                for (let conn of n.outputs['output_1'].connections) {
+                                    traverse(conn.node);
                                 }
                             }
-                        });
+                        }
                     }
                 });
             }
@@ -585,12 +637,14 @@ window.startVisualBotBuilder = function(id = null) {
 
 window.cancelBotBuild = function() { document.getElementById('server-settings-main-view').style.display = 'block'; document.getElementById('bot-builder-ui').style.display = 'none'; };
 
+// Notice that outputs are now set to '1' for all actions so they can be chained indefinitely
 window.addBotNode = function(t) {
-    if(t==='trigger') window.botEditor.addNode('trigger', 0, 1, 50, 100, 'trigger', {keyword:''}, `<div><div class="title-box">Trigger</div><input type="text" df-keyword placeholder="Keyword (e.g. /spawn)..."></div>`);
-    else if(t==='action') window.botEditor.addNode('action', 1, 0, 350, 50, 'action', {reply:''}, `<div><div class="title-box">Action</div><input type="text" df-reply placeholder="Reply..."></div>`);
-    else if(t==='code') window.botEditor.addNode('code', 1, 0, 350, 200, 'code', {url:'',code:''}, `<div><div class="title-box">Discord API Send</div><input type="text" df-url placeholder="Discord Channel ID..."><input type="text" df-code placeholder="Message..."></div>`);
-    else if(t==='discord_webhook') window.botEditor.addNode('discord_webhook', 1, 0, 350, 350, 'discord_webhook', {url:'', code:''}, `<div><div class="title-box">Discord Webhook</div><input type="text" df-url placeholder="Webhook URL..."><textarea df-code placeholder="Message content..." style="width:100%; margin-top:5px; background:rgba(0,0,0,0.2); color:white; border:none; padding:5px; resize:vertical;"></textarea></div>`);
-    else if(t==='webhook') window.botEditor.addNode('webhook', 1, 0, 350, 500, 'webhook', {url:'', payload:''}, `<div><div class="title-box">Generic Webhook</div><input type="text" df-url placeholder="URL (e.g. Unity Server)..."><textarea df-payload placeholder='{"command": "spawn", "item": "sword"}' style="width:100%; margin-top:5px; background:rgba(0,0,0,0.2); color:white; border:none; padding:5px; resize:vertical;"></textarea></div>`);
+    if(t==='trigger') window.botEditor.addNode('trigger', 0, 1, 50, 100, 'trigger', {keyword:''}, `<div><div class="title-box">Trigger</div><input type="text" df-keyword placeholder="Keyword (e.g. /give {item})..."></div>`);
+    else if(t==='action') window.botEditor.addNode('action', 1, 1, 350, 50, 'action', {reply:''}, `<div><div class="title-box">Action</div><input type="text" df-reply placeholder="Reply..."></div>`);
+    else if(t==='code') window.botEditor.addNode('code', 1, 1, 350, 200, 'code', {url:'',code:''}, `<div><div class="title-box">Discord API Send</div><input type="text" df-url placeholder="Discord Channel ID..."><input type="text" df-code placeholder="Message..."></div>`);
+    else if(t==='discord_webhook') window.botEditor.addNode('discord_webhook', 1, 1, 350, 350, 'discord_webhook', {url:'', code:''}, `<div><div class="title-box">Discord Webhook</div><input type="text" df-url placeholder="Webhook URL..."><textarea df-code placeholder="Message content..." style="width:100%; margin-top:5px; background:rgba(0,0,0,0.2); color:white; border:none; padding:5px; resize:vertical;"></textarea></div>`);
+    else if(t==='webhook') window.botEditor.addNode('webhook', 1, 1, 350, 500, 'webhook', {url:'', payload:''}, `<div><div class="title-box">Generic Webhook</div><input type="text" df-url placeholder="URL (e.g. Unity Server)..."><textarea df-payload placeholder='{"command": "spawn", "item": "{item}"}' style="width:100%; margin-top:5px; background:rgba(0,0,0,0.2); color:white; border:none; padding:5px; resize:vertical;"></textarea></div>`);
+    else if(t==='set_variable') window.botEditor.addNode('set_variable', 1, 1, 200, 200, 'set_variable', {var_name:'', var_value:''}, `<div><div class="title-box">Set Variable</div><input type="text" df-var_name placeholder="Variable Name..."><input type="text" df-var_value placeholder="Value..."></div>`);
 };
 
 window.saveVisualBot = async function() {
