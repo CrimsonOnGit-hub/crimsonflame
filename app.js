@@ -13,7 +13,7 @@ const firebaseConfig = {
 
 const ADMIN_EMAIL = "allaboutwaterdiamond@gmail.com";
 const DEFAULT_PFP = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
-const IMGBB_API_KEY = "d5fd4e3e9fedc18b9bed075f980f12b7"; 
+const IMGBB_API_KEY = "d5fd4e3e9fedc18b9bed075f980f12b7";
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -53,7 +53,7 @@ window.routeTo = function(page) {
     }
 };
 
-// --- OAUTH LOGIC (Runs on index.html) ---
+// --- OAUTH LOGIC ---
 const urlParams = new URLSearchParams(window.location.search);
 const oauthAppName = urlParams.get('app_name');
 const oauthRedirectUri = urlParams.get('redirect_uri');
@@ -134,13 +134,54 @@ window.submitLogin = async function(e) {
 };
 
 window.loginWithGoogle = async function(e) { e.preventDefault(); try { await signInWithPopup(auth, googleProvider); window.routeTo('home'); } catch (err) { window.showCustomAlert(err.message); } };
+
 window.submitProfile = async function(e) {
-    e.preventDefault(); const btn = e.target.querySelector('button[type="submit"]');
-    const newName = document.getElementById('display-name').value; const newPfp = document.getElementById('dashboard-pfp-preview').src;
-    if (currentUser) {
+    e.preventDefault(); 
+    const btn = e.target.querySelector('button[type="submit"]');
+    const newName = document.getElementById('display-name').value.trim();
+    const newUsername = document.getElementById('username-input').value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+    const newPfp = document.getElementById('dashboard-pfp-preview').src;
+    
+    if (!currentUser) return;
+    btn.disabled = true; 
+    btn.innerText = "Checking...";
+
+    try {
+        const userRef = doc(db, "users", currentUser.uid);
+        const userSnap = await getDoc(userRef);
+        const userData = userSnap.exists() ? userSnap.data() : {};
+
+        let updates = { displayName: newName, photoURL: newPfp };
+
+        if (newUsername && newUsername !== userData.username) {
+            if (newUsername.length < 3) throw new Error("Username must be at least 3 characters.");
+
+            if (userData.lastUsernameChange) {
+                const lastChange = userData.lastUsernameChange.toDate();
+                const daysSince = (new Date() - lastChange) / (1000 * 60 * 60 * 24);
+                if (daysSince < 30) {
+                    throw new Error(`Usernames can only be changed once every 30 days. (${Math.ceil(30 - daysSince)} days left)`);
+                }
+            }
+
+            const q = query(collection(db, "users"), where("username", "==", newUsername));
+            const snap = await getDocs(q);
+            if (!snap.empty) {
+                throw new Error(`Username @${newUsername} is already taken!`);
+            }
+
+            updates.username = newUsername;
+            updates.lastUsernameChange = serverTimestamp();
+        }
+
         await updateProfile(currentUser, { displayName: newName, photoURL: newPfp });
-        await setDoc(doc(db, "users", currentUser.uid), { displayName: newName, photoURL: newPfp }, { merge: true });
+        await setDoc(userRef, updates, { merge: true });
         showResponseText(btn, 'success', "Profile Saved!");
+    } catch (err) {
+        showResponseText(btn, 'error', err.message);
+    } finally {
+        btn.disabled = false; 
+        btn.innerText = "Save Profile Info";
     }
 };
 
@@ -170,9 +211,18 @@ onAuthStateChanged(auth, user => {
         currentUser = user; isGlobalAdmin = (user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase());
         
         if (navAuth) { navAuth.innerText = "Dashboard"; navAuth.onclick = () => window.routeTo('dashboard'); }
-        setDoc(doc(db, "users", currentUser.uid), { uid: currentUser.uid, username: (user.displayName || user.email.split('@')[0]).toLowerCase(), displayName: user.displayName || user.email.split('@')[0] }, { merge: true });
+        
+        getDoc(doc(db, "users", currentUser.uid)).then(docSnap => {
+            if (!docSnap.exists() || !docSnap.data().username) {
+                const baseName = (user.displayName || user.email.split('@')[0]);
+                setDoc(doc(db, "users", currentUser.uid), { 
+                    uid: currentUser.uid, 
+                    username: baseName.toLowerCase().replace(/[^a-z0-9_]/g, ''), 
+                    displayName: baseName 
+                }, { merge: true });
+            }
+        });
 
-        // Page specific unlocks
         if (currentPage === 'dashboard.html') {
             document.getElementById('login-container').style.display = 'none';
             document.getElementById('dashboard-container').style.display = 'block';
@@ -184,6 +234,9 @@ onAuthStateChanged(auth, user => {
             userDocUnsub = onSnapshot(doc(db, "users", currentUser.uid), (docSnap) => {
                 if(docSnap.exists()) {
                     const data = docSnap.data();
+                    
+                    document.getElementById('username-input').value = data.username || "";
+
                     if(data.discordId) {
                         document.getElementById('discord-unlinked').style.display = 'none';
                         document.getElementById('discord-linked').style.display = 'flex';
@@ -217,7 +270,7 @@ onAuthStateChanged(auth, user => {
     }
 });
 
-// --- PUBLIC DATA (HOME / NEWS) ---
+// --- PUBLIC DATA ---
 window.fetchHomeImages = async function() {
     const gal = document.getElementById('home-gallery'); if(!gal) return;
     try {
@@ -288,7 +341,7 @@ window.selectChannel = function(id, name, el) {
     chatterMessagesUnsub = onSnapshot(query(collection(db, "discord_servers", activeServerId, "channels", id, "messages"), orderBy("timestamp", "asc")), snap => {
         box.innerHTML = "";
         snap.forEach(mDoc => {
-            const m = mDoc.data(); const timeStr = formatTime(m.timestamp); const botTag = m.isBot ? `<span class="bot-tag">✔ APP</span>` : '';
+            const m = mDoc.data(); const timeStr = formatTime(m.timestamp); const botTag = m.isBot ? `<span class="bot-tag">APP</span>` : '';
             let txt = m.text; if (txt.startsWith('chatter-bot-code-')) txt = `<span style="color:#4ade80; font-family:monospace;">[WEBHOOK]: ${txt}</span>`;
             box.innerHTML += `<div class="msg"><img src="${m.senderPfp || DEFAULT_PFP}" class="chat-pfp"><div class="msg-content"><div class="msg-header"><span class="msg-sender">${m.senderName}</span> ${botTag} <span class="msg-timestamp">${timeStr}</span></div><div class="msg-text">${txt}</div></div></div>`;
         });
@@ -297,9 +350,21 @@ window.selectChannel = function(id, name, el) {
 };
 
 window.submitChat = async function(e) {
-    e.preventDefault(); const inp = document.getElementById('chat-input'); const text = inp.value.trim(); if(!text || !currentUser || !activeServerId || !activeChannelId) return;
+    e.preventDefault(); 
+    const inp = document.getElementById('chat-input'); 
+    const text = inp.value.trim(); 
+    
+    if(!text || !currentUser || !activeServerId || !activeChannelId) return;
+    
     const ref = collection(db, "discord_servers", activeServerId, "channels", activeChannelId, "messages");
-    await addDoc(ref, { text, senderUid: currentUser.uid, senderName: currentUser.displayName || "User", senderPfp: currentUser.photoURL || DEFAULT_PFP, timestamp: serverTimestamp() });
+    
+    await addDoc(ref, { 
+        text, 
+        senderUid: currentUser.uid, 
+        senderName: currentUser.displayName || "User", 
+        senderPfp: currentUser.photoURL || DEFAULT_PFP, 
+        timestamp: serverTimestamp() 
+    });
     inp.value = "";
     
     if(activeServerData && activeServerData.bots) {
@@ -311,11 +376,36 @@ window.submitChat = async function(e) {
                         n.outputs['output_1'].connections.forEach(conn => {
                             const next = nodes[conn.node];
                             if (next?.name === 'action' && next.data.reply) {
-                                setTimeout(() => addDoc(ref, { text: next.data.reply, senderName: bot.name, senderPfp: 'https://cdn-icons-png.flaticon.com/512/4712/4712035.png', isBot: true, timestamp: serverTimestamp() }), 600);
-                            } else if (next?.name === 'code' && next.data.url && next.data.code) {
-                                const codeStr = `chatter-bot-code-${next.data.code}`;
-                                fetch(next.data.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ payload: codeStr }) }).catch(()=>{});
-                                setTimeout(() => addDoc(ref, { text: codeStr, senderName: bot.name, senderPfp: 'https://cdn-icons-png.flaticon.com/512/4712/4712035.png', isBot: true, timestamp: serverTimestamp() }), 600);
+                                setTimeout(() => addDoc(ref, { 
+                                    text: next.data.reply, 
+                                    senderName: bot.name, 
+                                    senderPfp: 'https://cdn-icons-png.flaticon.com/512/4712/4712035.png', 
+                                    isBot: true, 
+                                    timestamp: serverTimestamp() 
+                                }), 600);
+                            } 
+                            else if (next?.name === 'code' && next.data.url && next.data.code) {
+                                // SECURE FETCH: Hits Discloud API, token remains hidden.
+                                fetch(`https://https://crimsonflame-api.discloud.app/api/send_discord`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ 
+                                        channelId: next.data.url,
+                                        message: next.data.code
+                                    })
+                                })
+                                .then(res => res.json())
+                                .then(data => {
+                                    if(data.success) {
+                                        addDoc(ref, { 
+                                            text: `*System: ${bot.name} successfully pushed logic to Discord via API.*`, 
+                                            senderName: bot.name, 
+                                            senderPfp: 'https://cdn-icons-png.flaticon.com/512/4712/4712035.png', 
+                                            isBot: true, 
+                                            timestamp: serverTimestamp() 
+                                        });
+                                    }
+                                }).catch(()=>{});
                             }
                         });
                     }
@@ -371,7 +461,7 @@ window.cancelBotBuild = function() { document.getElementById('server-settings-ma
 window.addBotNode = function(t) {
     if(t==='trigger') window.botEditor.addNode('trigger', 0, 1, 50, 100, 'trigger', {keyword:''}, `<div><div class="title-box">📥 Trigger</div><input type="text" df-keyword placeholder="Keyword..."></div>`);
     else if(t==='action') window.botEditor.addNode('action', 1, 0, 350, 50, 'action', {reply:''}, `<div><div class="title-box">📤 Action</div><input type="text" df-reply placeholder="Reply..."></div>`);
-    else if(t==='code') window.botEditor.addNode('code', 1, 0, 350, 200, 'code', {url:'',code:''}, `<div><div class="title-box">⚙️ Webhook</div><input type="text" df-url placeholder="URL..."><input type="text" df-code placeholder="Code..."></div>`);
+    else if(t==='code') window.botEditor.addNode('code', 1, 0, 350, 200, 'code', {url:'',code:''}, `<div><div class="title-box">⚙️ Discord Send</div><input type="text" df-url placeholder="Channel ID..."><input type="text" df-code placeholder="Message..."></div>`);
 };
 window.saveVisualBot = async function() {
     const n = document.getElementById('botName').value.trim(); if(!n) return window.showCustomAlert("Need a name!");
@@ -419,7 +509,7 @@ window.closeThreadView = () => { document.getElementById('list-view').style.disp
 window.closeActiveTicket = () => { window.showCustomPrompt("Close", "Reason:", "Reason...", async (r) => { await updateDoc(doc(db, "tickets", activeTicketId), { status: "Closed", closeReason: r }); window.closeThreadView(); }); };
 window.submitTicketChat = async function(e) { e.preventDefault(); const inp = document.getElementById('ticket-chat-input'); await addDoc(collection(db, "tickets", activeTicketId, "messages"), { text: inp.value, sender: currentUser.email, senderName: currentUser.displayName, timestamp: serverTimestamp() }); inp.value = ""; };
 
-// --- IMAGE UPLOAD LOGIC ---
+// --- IMAGE UPLOAD ---
 document.querySelectorAll('.drop-zone').forEach(zone => {
     const input = zone.querySelector('input[type="file"]'); if(!input) return;
     zone.onclick = () => input.click();
