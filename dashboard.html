@@ -55,7 +55,13 @@
                     <input type="file" id="pfp-file-input" accept="image/*" style="display:none;">
                 </div>
                 <div id="upload-status" class="status-text"></div>
+                
+                <label style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 5px; display: block;">Display Name (Seen by players)</label>
                 <input type="text" id="display-name" placeholder="Display Name">
+
+                <label style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 5px; display: block;">Username (Backend/Bans - Max 1 change per month)</label>
+                <input type="text" id="username-input" placeholder="username" style="font-family: monospace;">
+
                 <button type="submit" class="btn-primary">Save Profile Info</button>
             </form>
 
