@@ -340,7 +340,7 @@ window.selectChannel = function(id, name, el) {
     if(chatForm && !document.getElementById('slash-menu-container')) {
         const slashMenu = document.createElement('div');
         slashMenu.id = 'slash-menu-container';
-        slashMenu.style.cssText = "display:none; position:absolute; bottom:100%; left:0; width:100%; max-width:400px; background:#2b2d31; border:1px solid #1e1f22; border-radius:8px; z-index:100; margin-bottom:10px; max-height:200px; overflow-y:auto; box-shadow:0 8px 16px rgba(0,0,0,0.3); padding:5px;";
+        slashMenu.style.cssText = "display:none; position:absolute; bottom:100%; left:0; width:100%; max-width:400px; background:rgba(20,20,20,0.9); border:1px solid rgba(255,255,255,0.1); border-radius:8px; z-index:100; margin-bottom:10px; max-height:200px; overflow-y:auto; box-shadow:0 8px 16px rgba(0,0,0,0.5); padding:5px; backdrop-filter:blur(10px);";
         chatForm.style.position = 'relative';
         chatForm.insertBefore(slashMenu, chatForm.firstChild);
         
@@ -366,7 +366,7 @@ window.selectChannel = function(id, name, el) {
                 if(cmds.length > 0) {
                     slashMenu.innerHTML = cmds.map(c => `
                         <div style="display:flex; align-items:center; gap:10px; padding:8px; cursor:pointer; border-radius:4px;" 
-                             onmouseover="this.style.background='#3f4147'" 
+                             onmouseover="this.style.background='rgba(255,255,255,0.1)'" 
                              onmouseout="this.style.background='transparent'"
                              onclick="document.getElementById('chat-input').value='${c.cmd.split(' ')[0]} '; document.getElementById('slash-menu-container').style.display='none'; document.getElementById('chat-input').focus();">
                             <img src="${c.pfp}" style="width:30px; height:30px; border-radius:50%; object-fit:cover;">
@@ -603,8 +603,8 @@ window.startVisualBotBuilder = function(id = null) {
             pfpInput.style.marginLeft = '10px';
             pfpInput.style.padding = '8px';
             pfpInput.style.borderRadius = '5px';
-            pfpInput.style.border = '1px solid #1e1f22';
-            pfpInput.style.background = 'rgba(0,0,0,0.2)';
+            pfpInput.style.border = '1px solid rgba(255,255,255,0.1)';
+            pfpInput.style.background = 'rgba(0,0,0,0.5)';
             pfpInput.style.color = 'white';
             nameInput.parentNode.insertBefore(pfpInput, nameInput.nextSibling);
         }
@@ -628,12 +628,12 @@ window.startVisualBotBuilder = function(id = null) {
 window.cancelBotBuild = function() { document.getElementById('server-settings-main-view').style.display = 'block'; document.getElementById('bot-builder-ui').style.display = 'none'; };
 
 window.addBotNode = function(t) {
-    if(t==='trigger') window.botEditor.addNode('trigger', 0, 1, 50, 100, 'trigger', {keyword:''}, `<div><div class="title-box">Trigger</div><input type="text" df-keyword placeholder="Keyword (e.g. /give {item})..."></div>`);
-    else if(t==='action') window.botEditor.addNode('action', 1, 1, 350, 50, 'action', {reply:''}, `<div><div class="title-box">Action</div><input type="text" df-reply placeholder="Reply..."></div>`);
-    else if(t==='code') window.botEditor.addNode('code', 1, 1, 350, 200, 'code', {url:'',code:''}, `<div><div class="title-box">Discord API Send</div><input type="text" df-url placeholder="Discord Channel ID..."><input type="text" df-code placeholder="Message..."></div>`);
-    else if(t==='discord_webhook') window.botEditor.addNode('discord_webhook', 1, 1, 350, 350, 'discord_webhook', {url:'', code:''}, `<div><div class="title-box">Discord Webhook</div><input type="text" df-url placeholder="Webhook URL..."><textarea df-code placeholder="Message content..." style="width:100%; margin-top:5px; background:rgba(0,0,0,0.2); color:white; border:none; padding:5px; resize:vertical;"></textarea></div>`);
-    else if(t==='webhook') window.botEditor.addNode('webhook', 1, 1, 350, 500, 'webhook', {url:'', payload:''}, `<div><div class="title-box">Generic Webhook</div><input type="text" df-url placeholder="URL (e.g. Unity Server)..."><textarea df-payload placeholder='{"command": "spawn", "item": "{item}"}' style="width:100%; margin-top:5px; background:rgba(0,0,0,0.2); color:white; border:none; padding:5px; resize:vertical;"></textarea></div>`);
-    else if(t==='set_variable') window.botEditor.addNode('set_variable', 1, 1, 200, 200, 'set_variable', {var_name:'', var_value:''}, `<div><div class="title-box">Set Variable</div><input type="text" df-var_name placeholder="Variable Name..."><input type="text" df-var_value placeholder="Value..."></div>`);
+    if(t==='trigger') window.botEditor.addNode('trigger', 0, 1, 50, 100, 'trigger', {keyword:''}, `<div><div class="title-box" style="background:rgba(0,0,0,0.5); padding:8px;">Trigger</div><input type="text" df-keyword placeholder="Keyword (e.g. /give {item})..." style="background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); color:white;"></div>`);
+    else if(t==='action') window.botEditor.addNode('action', 1, 1, 350, 50, 'action', {reply:''}, `<div><div class="title-box" style="background:rgba(0,0,0,0.5); padding:8px;">Action</div><input type="text" df-reply placeholder="Reply..." style="background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); color:white;"></div>`);
+    else if(t==='code') window.botEditor.addNode('code', 1, 1, 350, 200, 'code', {url:'',code:''}, `<div><div class="title-box" style="background:rgba(0,0,0,0.5); padding:8px;">Discord API Send</div><input type="text" df-url placeholder="Discord Channel ID..." style="background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); color:white;"><input type="text" df-code placeholder="Message..." style="background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); color:white;"></div>`);
+    else if(t==='discord_webhook') window.botEditor.addNode('discord_webhook', 1, 1, 350, 350, 'discord_webhook', {url:'', code:''}, `<div><div class="title-box" style="background:rgba(0,0,0,0.5); padding:8px;">Discord Webhook</div><input type="text" df-url placeholder="Webhook URL..." style="background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); color:white;"><textarea df-code placeholder="Message content..." style="width:100%; margin-top:5px; background:rgba(0,0,0,0.3); color:white; border:1px solid rgba(255,255,255,0.1); padding:5px; resize:vertical;"></textarea></div>`);
+    else if(t==='webhook') window.botEditor.addNode('webhook', 1, 1, 350, 500, 'webhook', {url:'', payload:''}, `<div><div class="title-box" style="background:rgba(0,0,0,0.5); padding:8px;">Generic Webhook</div><input type="text" df-url placeholder="URL (e.g. Unity Server)..." style="background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); color:white;"><textarea df-payload placeholder='{"command": "spawn", "item": "{item}"}' style="width:100%; margin-top:5px; background:rgba(0,0,0,0.3); color:white; border:1px solid rgba(255,255,255,0.1); padding:5px; resize:vertical;"></textarea></div>`);
+    else if(t==='set_variable') window.botEditor.addNode('set_variable', 1, 1, 200, 200, 'set_variable', {var_name:'', var_value:''}, `<div><div class="title-box" style="background:rgba(0,0,0,0.5); padding:8px;">Set Variable</div><input type="text" df-var_name placeholder="Variable Name..." style="background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); color:white;"><input type="text" df-var_value placeholder="Value..." style="background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); color:white;"></div>`);
 };
 
 window.saveVisualBot = async function() {
