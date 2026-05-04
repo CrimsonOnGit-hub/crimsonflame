@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence, updateProfile, sendEmailVerification, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, getDoc, query, orderBy, where, doc, onSnapshot, updateDoc, serverTimestamp, arrayUnion, arrayRemove, setDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, getDoc, query, orderBy, where, doc, onSnapshot, updateDoc, serverTimestamp, arrayUnion, arrayRemove, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyBSSJKDrFJ1_qlliZqgw34CY2TSaKOxxxM",
@@ -205,6 +205,39 @@ window.unlinkDiscord = async function() {
     window.showCustomAlert("Discord account unlinked.");
 };
 
+window.toggleRPC = async function(e) {
+    if(!currentUser) return;
+    try {
+        await updateDoc(doc(db, "users", currentUser.uid), { rpcEnabled: e.target.checked });
+        window.showCustomAlert(e.target.checked ? "Discord RPC Broadcast Enabled" : "Discord RPC Broadcast Disabled");
+    } catch(err) { console.error(err); }
+};
+
+window.submitVRLinkCode = async function(e) {
+    e.preventDefault();
+    if (!currentUser) return;
+    
+    const code = document.getElementById('vr-link-input').value.trim();
+    if (code.length !== 6) return window.showCustomAlert("Code must be 6 digits.");
+
+    try {
+        const codeRef = doc(db, 'vr_link_codes', code);
+        const codeSnap = await getDoc(codeRef);
+
+        if (codeSnap.exists()) {
+            const pfId = codeSnap.data().playfabId;
+            await updateDoc(doc(db, "users", currentUser.uid), { playfabId: pfId });
+            await deleteDoc(codeRef);
+            window.showCustomAlert("VR Account successfully linked!");
+        } else {
+            window.showCustomAlert("Invalid or expired VR code.");
+        }
+    } catch (err) {
+        console.error(err);
+        window.showCustomAlert("An error occurred while linking.");
+    }
+};
+
 let userDocUnsub = null;
 
 onAuthStateChanged(auth, user => {
@@ -242,11 +275,23 @@ onAuthStateChanged(auth, user => {
                     if(data.discordId) {
                         document.getElementById('discord-unlinked').style.display = 'none';
                         document.getElementById('discord-linked').style.display = 'flex';
+                        document.getElementById('rpc-settings').style.display = 'block';
                         document.getElementById('discord-username').innerText = `@${data.discordUsername}`;
                         document.getElementById('discord-avatar').src = data.discordAvatar || DEFAULT_PFP;
+                        if(document.getElementById('rpc-toggle')) document.getElementById('rpc-toggle').checked = data.rpcEnabled || false;
                     } else {
                         document.getElementById('discord-unlinked').style.display = 'block';
                         document.getElementById('discord-linked').style.display = 'none';
+                        document.getElementById('rpc-settings').style.display = 'none';
+                    }
+
+                    if(data.playfabId) {
+                        document.getElementById('vr-unlinked').style.display = 'none';
+                        document.getElementById('vr-linked').style.display = 'flex';
+                        document.getElementById('vr-playfab-id').innerText = data.playfabId;
+                    } else {
+                        document.getElementById('vr-unlinked').style.display = 'block';
+                        document.getElementById('vr-linked').style.display = 'none';
                     }
                 }
             });
