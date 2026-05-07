@@ -21,14 +21,39 @@
     </div>
 
     <nav class="hub-nav">
-        <div class="nav-logo" onclick="window.location.href='index.html'">CrimsonFlame <span style="color:var(--text-muted); font-size:1rem;">| Dash</span></div>
+        <div class="nav-logo">
+            <img src="https://cdn-icons-png.flaticon.com/512/149/149071.png" style="width: 24px; height: 24px; filter: invert(1);"> 
+            CrimsonFlame
+        </div>
         <div class="nav-links">
-            <a href="index.html" class="nav-btn">Hub</a>
-            <a href="chatter.html" class="nav-btn">Chatter</a>
-            <a href="dialog.html" class="nav-btn">Dialog</a>
-            <a href="support.html" class="nav-btn">Support</a>
+            <a href="index.html" class="nav-btn active">Home</a>
+            
+            <div class="nav-dropdown">
+                <a class="nav-btn">Legal ▾</a>
+                <div class="dropdown-content">
+                    <a href="terms.html">Terms of Service</a>
+                    <a href="privacy.html">Privacy Policy</a>
+                </div>
+            </div>
+
+            <div class="nav-dropdown">
+                <a class="nav-btn">Games ▾</a>
+                <div class="dropdown-content">
+                    <a href="crimson-protocol.html">Crimson Protocol</a>
+                </div>
+            </div>
+
+            <div class="nav-dropdown">
+                <a class="nav-btn">Support ▾</a>
+                <div class="dropdown-content">
+                    <a href="https://crimsonongit-hub.github.io/CrimsonFlameSupport">Ticket System</a>
+                </div>
+            </div>
+
+            <a href="dashboard.html" class="nav-btn">Dashboard</a>
         </div>
     </nav>
+
 
     <main id="main-content" style="display: flex; justify-content: center; align-items: start; padding-top: 40px; position: relative; z-index: 10;">
         
