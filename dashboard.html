@@ -5,22 +5,32 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard | CrimsonFlame</title>
     <link rel="stylesheet" href="style.css">
+    
+    <script>
+        if(localStorage.getItem('theme') === 'liquid-light') {
+            document.documentElement.classList.add('theme-liquid-light');
+        }
+    </script>
 </head>
 <body>
 
-    <svg style="position: absolute; pointer-events: none; width: 0; height: 0;" xmlns="http://www.w3.org/2000/svg" version="1.1">
-        <defs><filter id="goo"><feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur" /><feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 19 -9" result="goo" /><feComposite in="SourceGraphic" in2="goo" operator="atop"/></filter></defs>
-    </svg>
+    <div class="liquid-bg-container">
+        <svg style="position: absolute; pointer-events: none; width: 0; height: 0;" xmlns="http://www.w3.org/2000/svg" version="1.1">
+            <defs><filter id="goo"><feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur" /><feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 19 -9" result="goo" /><feComposite in="SourceGraphic" in2="goo" operator="atop"/></filter></defs>
+        </svg>
+    </div>
 
-    <nav>
-        <div class="nav-logo" onclick="window.routeTo('home')">CrimsonFlame <span style="color:var(--text-muted); font-size:1rem;">| Dash</span></div>
+    <nav class="hub-nav">
+        <div class="nav-logo" onclick="window.location.href='index.html'">CrimsonFlame <span style="color:var(--text-muted); font-size:1rem;">| Dash</span></div>
         <div class="nav-links">
-            <a onclick="window.routeTo('home')" class="nav-btn">Back to Hub</a>
-            <a onclick="window.routeTo('chatter')" class="nav-btn">Chatter</a>
+            <a href="index.html" class="nav-btn">Hub</a>
+            <a href="chatter.html" class="nav-btn">Chatter</a>
+            <a href="dialog.html" class="nav-btn">Dialog</a>
+            <a href="support.html" class="nav-btn">Support</a>
         </div>
     </nav>
 
-    <main id="main-content" style="display: flex; justify-content: center; align-items: start; padding-top: 40px;">
+    <main id="main-content" style="display: flex; justify-content: center; align-items: start; padding-top: 40px; position: relative; z-index: 10;">
         
         <div id="login-container" class="card-container" style="width: 100%; max-width: 450px;">
             <h2 id="auth-title">Account Login</h2>
@@ -49,9 +59,9 @@
             
             <hr style="border-color: var(--glass-border); margin: 20px 0;">
             <form onsubmit="submitProfile(event)">
-                <div id="pfp-drop-zone" class="drop-zone">
+                <div id="pfp-drop-zone" class="drop-zone" onclick="document.getElementById('pfp-file-input').click()">
                     <span>Drop new image to change avatar</span>
-                    <input type="file" id="pfp-file-input" accept="image/*" style="display:none;">
+                    <input type="file" id="pfp-file-input" accept="image/*" style="display:none;" onchange="handleUpload(event.target.files[0], 'pfp')">
                 </div>
                 <div id="upload-status" class="status-text"></div>
                 
@@ -63,6 +73,21 @@
 
                 <button type="submit" class="btn-primary">Save Profile Info</button>
             </form>
+
+            <hr style="border-color: rgba(255,255,255,0.1); margin: 20px 0;">
+            <h3 style="color: #fca5a5; margin-top: 0; display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 1.2rem;">✨</span> Theme Settings
+            </h3>
+            
+            <div style="margin-top: 10px; padding: 15px; background: rgba(0,0,0,0.3); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                    <input type="checkbox" id="theme-toggle" onchange="window.toggleTheme(event)" style="width: 18px; height: 18px; accent-color: var(--crimson);">
+                    <div>
+                        <span style="color: white; font-weight: bold; display: block;">Enable Liquid Light Background</span>
+                        <span style="color: #949ba4; font-size: 0.8rem;">Turns on the animated fiery background across all CrimsonFlame sites.</span>
+                    </div>
+                </label>
+            </div>
 
             <hr style="border-color: var(--glass-border); margin: 20px 0;">
             <h3 style="color: #5865F2; margin-top: 0; display: flex; align-items: center; gap: 8px;">
@@ -84,59 +109,17 @@
                 </div>
                 <button class="btn-danger" style="margin-left: auto; width: auto; padding: 8px 12px; font-size: 0.8rem; background: rgba(220, 20, 60, 0.2); border: 1px solid var(--crimson);" onclick="unlinkDiscord()">Unlink</button>
             </div>
-
-            <div id="rpc-settings" style="display: none; margin-top: 15px; padding: 15px; background: rgba(0,0,0,0.3); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
-                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                    <input type="checkbox" id="rpc-toggle" onchange="window.toggleRPC(event)" style="width: 18px; height: 18px; accent-color: var(--crimson);">
-                    <span style="color: #dbdee1; font-size: 0.9rem;">Broadcast VR Status to Discord (Requires PC Bridge)</span>
-                </label>
-            </div>
-
-            <hr style="border-color: rgba(255,255,255,0.1); margin: 20px 0;">
-            <h3 style="color: #4ade80; margin-top: 0; display: flex; align-items: center; gap: 8px;">
-                <img src="https://cdn-icons-png.flaticon.com/512/806/806008.png" style="width: 24px; filter: invert(1);"> 
-                Meta Quest VR Link
-            </h3>
-            
-            <div id="vr-unlinked">
-                <p style="color: #949ba4; font-size: 0.9rem;">Generate a 6-digit code in Crimson Protocol and enter it here to link your VR inventory.</p>
-                <form onsubmit="window.submitVRLinkCode(event)" style="display: flex; gap: 10px;">
-                    <input type="text" id="vr-link-input" placeholder="000000" maxlength="6" style="flex: 1; font-family: monospace; font-size: 1.2rem; text-align: center; letter-spacing: 5px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: white;">
-                    <button type="submit" class="btn-primary" style="width: auto; background: #4ade80; color: black; font-weight: bold;">Link VR</button>
-                </form>
-            </div>
-
-            <div id="vr-linked" style="display: none; align-items: center; gap: 12px; background: rgba(74, 222, 128, 0.1); border: 1px solid #4ade80; padding: 15px; border-radius: 12px;">
-                <div style="width: 45px; height: 45px; border-radius: 50%; background: #4ade80; display: flex; align-items: center; justify-content: center;">
-                    <img src="https://cdn-icons-png.flaticon.com/512/806/806008.png" style="width: 24px; filter: invert(1);">
-                </div>
-                <div>
-                    <p style="margin: 0; color: #a1a1aa; font-size: 0.75rem; text-transform: uppercase; font-weight: bold;">PlayFab Account Linked</p>
-                    <strong id="vr-playfab-id" style="color: #fff; font-size: 0.9rem; font-family: monospace;"></strong>
-                </div>
-            </div>
         </div>
     </main>
 
-    <div id="custom-prompt" class="custom-modal-overlay">
-        <div class="custom-modal-box"><div class="custom-modal-content">
-            <h3 id="custom-prompt-title" class="custom-modal-title">Prompt</h3>
-            <p id="custom-prompt-desc" class="custom-modal-text"></p>
-            <input type="text" id="custom-prompt-input" class="custom-modal-input" autocomplete="off">
-            <div class="custom-modal-buttons">
-                <button id="custom-prompt-cancel" class="custom-modal-btn cancel">Cancel</button>
-                <button id="custom-prompt-confirm" class="custom-modal-btn confirm">Confirm</button>
-            </div>
-        </div></div>
-    </div>
     <div id="custom-alert" class="custom-modal-overlay">
         <div class="custom-modal-box"><div class="custom-modal-content">
             <h3 class="custom-modal-title">CrimsonFlame Alert</h3>
             <p id="custom-alert-message" class="custom-modal-text"></p>
-            <button id="custom-alert-ok" class="custom-modal-btn confirm" style="width: 50%;">OK</button>
+            <button onclick="document.getElementById('custom-alert').classList.remove('active')" class="custom-modal-btn confirm" style="width: 50%;">OK</button>
         </div></div>
     </div>
 
-    <script type="module" src="app.js"></script>
+    <script type="module" src="dashboard.js"></script>
 </body>
 </html>
